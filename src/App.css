@@ -1,0 +1,14 @@
+.app {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.app > h1 {
+  text-align: center;
+  margin: 0;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  font-size: 32px;
+  font-weight: bold;
+}

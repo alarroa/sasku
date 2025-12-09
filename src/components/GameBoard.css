@@ -1,0 +1,261 @@
+.game-board {
+  width: 100%;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  padding: 20px;
+  color: white;
+}
+
+.message-bar {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.game-info {
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.scores {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.scores h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.score-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 5px 0;
+}
+
+.round-scores {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.round-scores button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.round-scores button:hover {
+  background: #45a049;
+}
+
+.trump-info {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.current-trick {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px auto;
+  max-width: 600px;
+  backdrop-filter: blur(10px);
+}
+
+.current-trick h3 {
+  margin-top: 0;
+  text-align: center;
+}
+
+.trick-cards {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.trick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.trick-player {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.bidding-controls {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px auto;
+  max-width: 600px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.bidding-controls h3 {
+  margin-top: 0;
+}
+
+.bid-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 15px;
+}
+
+.bid-buttons button {
+  padding: 10px 20px;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  min-width: 50px;
+}
+
+.bid-buttons button:hover {
+  background: #1976D2;
+}
+
+.pass-button {
+  padding: 10px 30px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.pass-button:hover {
+  background: #d32f2f;
+}
+
+.trump-choice {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px auto;
+  max-width: 600px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.trump-choice h3 {
+  margin-top: 0;
+}
+
+.trump-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.trump-buttons button {
+  padding: 15px 30px;
+  background: #9C27B0;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.trump-buttons button:hover {
+  background: #7B1FA2;
+}
+
+.players-layout {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  height: 600px;
+  margin: 40px auto;
+}
+
+.player-position {
+  position: absolute;
+}
+
+.player-position.bottom {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.player-position.top {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.player-position.left {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.player-position.right {
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.game-end {
+  background: rgba(76, 175, 80, 0.9);
+  padding: 30px;
+  border-radius: 8px;
+  margin: 20px auto;
+  max-width: 400px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.game-end h2 {
+  margin-top: 0;
+}
+
+.game-end button {
+  padding: 15px 30px;
+  background: white;
+  color: #4CAF50;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 20px;
+}
+
+.game-end button:hover {
+  background: #f0f0f0;
+}

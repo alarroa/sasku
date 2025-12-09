@@ -1,0 +1,31 @@
+.hand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.hand .player-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+}
+
+.hand.current-player .player-name {
+  color: #4CAF50;
+}
+
+.hand .cards {
+  display: flex;
+  gap: -20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hand .cards .card {
+  margin: 0 -10px;
+}
+
+.hand .cards .card:hover {
+  z-index: 10;
+}
