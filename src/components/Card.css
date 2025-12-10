@@ -63,3 +63,32 @@
   font-size: 12px;
   font-weight: bold;
 }
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .card {
+    width: 50px;
+    height: 70px;
+  }
+
+  .card-rank {
+    font-size: 16px;
+    margin-bottom: 2px;
+  }
+
+  .card-suit {
+    font-size: 22px;
+  }
+
+  .picture-badge {
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    top: 2px;
+    right: 2px;
+  }
+
+  .card:hover:not(.disabled) {
+    transform: translateY(-5px);
+  }
+}

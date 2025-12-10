@@ -133,18 +133,28 @@ export function canPlayCard(state, playerIndex, card) {
 
   const leadCard = state.currentTrick[0].card;
 
-  // Must follow suit if possible (pictures or non-pictures of same suit)
+  // Trumbi ülelöömise kohustust ei ole, masti kaotamine on lubatud
+  // This means: no obligation to beat trump/suit, you can throw away
+
   if (leadCard.isPicture) {
     // If lead is picture, must play picture if have one
+    // BUT: no need to beat it - can play any picture
     const hasPictures = hand.some(c => c.isPicture);
     if (hasPictures && !card.isPicture) return false;
+    // If playing a picture, it's valid (no need to check if it beats lead)
+    if (card.isPicture) return true;
+    // If no pictures, can play anything
+    return !hasPictures;
   } else {
     // If lead is non-picture, must follow suit if possible
     const hasSuit = hand.some(c => !c.isPicture && c.suit === leadCard.suit);
-    if (hasSuit && (card.isPicture || card.suit !== leadCard.suit)) return false;
+    if (hasSuit) {
+      // Must play same suit if have it, but can be any card of that suit
+      return !card.isPicture && card.suit === leadCard.suit;
+    }
+    // If don't have the suit, can play anything (including pictures/trump)
+    return true;
   }
-
-  return true;
 }
 
 export function playCard(state, playerIndex, card) {

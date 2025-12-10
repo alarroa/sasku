@@ -42,6 +42,36 @@
   margin: 5px 0;
 }
 
+.score-value {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.current-trick-points {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.current-trick-points h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.trick-points-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 5px 0;
+  font-size: 14px;
+}
+
+.points-value {
+  font-weight: bold;
+  color: #4CAF50;
+}
+
 .round-scores {
   margin-top: 15px;
   padding-top: 15px;
@@ -258,4 +288,61 @@
 
 .game-end button:hover {
   background: #f0f0f0;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .game-board {
+    padding: 10px;
+  }
+
+  .message-bar {
+    font-size: 14px;
+    padding: 10px;
+  }
+
+  .game-info {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .scores {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .scores h3 {
+    font-size: 16px;
+  }
+
+  .trump-info {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .players-layout {
+    height: 500px;
+    margin: 20px auto;
+  }
+
+  .bidding-controls,
+  .trump-choice,
+  .current-trick {
+    padding: 15px;
+    margin: 15px 10px;
+  }
+
+  .bid-buttons button,
+  .trump-buttons button {
+    padding: 10px 15px;
+    font-size: 14px;
+  }
+
+  .current-trick h3 {
+    font-size: 16px;
+  }
+
+  .trick-cards {
+    gap: 10px;
+  }
 }

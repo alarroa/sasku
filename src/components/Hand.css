@@ -8,24 +8,57 @@
 .hand .player-name {
   font-size: 16px;
   font-weight: bold;
-  color: #333;
+  color: white;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 5px 15px;
+  border-radius: 15px;
 }
 
 .hand.current-player .player-name {
-  color: #4CAF50;
+  background: #4CAF50;
 }
 
 .hand .cards {
   display: flex;
-  gap: -20px;
   flex-wrap: wrap;
   justify-content: center;
+  gap: 5px;
 }
 
 .hand .cards .card {
-  margin: 0 -10px;
+  margin: 0;
 }
 
-.hand .cards .card:hover {
+.hand .cards .card:hover:not(.card-back) {
   z-index: 10;
+}
+
+/* Card back styling */
+.card-back {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  cursor: default;
+  border-color: #5a67d8;
+}
+
+.card-back:hover {
+  transform: none !important;
+}
+
+.card-back-design {
+  font-size: 48px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .hand .cards {
+    gap: 3px;
+    max-width: 100%;
+  }
+
+  .hand .cards .card {
+    width: 50px;
+    height: 70px;
+    font-size: 12px;
+  }
 }

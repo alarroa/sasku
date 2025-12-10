@@ -155,18 +155,52 @@ export default function GameBoard() {
     );
   };
 
+  const calculateCurrentTrickPoints = () => {
+    const teamPoints = [0, 0];
+
+    // Count points from won tricks
+    gameState.tricksWon.forEach((tricks, playerIndex) => {
+      const team = getTeam(playerIndex);
+      tricks.forEach(trick => {
+        trick.forEach(play => {
+          teamPoints[team] += play.card.points;
+        });
+      });
+    });
+
+    return teamPoints;
+  };
+
   const renderScores = () => {
+    const currentPoints = calculateCurrentTrickPoints();
+    const showCurrentPoints = gameState.phase === GAME_PHASES.PLAYING && gameState.tricksWon.some(t => t.length > 0);
+
     return (
       <div className="scores">
-        <h3>Seis:</h3>
+        <h3>Mänguseis:</h3>
         <div className="score-row">
           <span>Meeskond 1 (Sina & Partner):</span>
-          <span>{gameState.gameScores[0]} punkti</span>
+          <span className="score-value">{gameState.gameScores[0]} punkti</span>
         </div>
         <div className="score-row">
           <span>Meeskond 2:</span>
-          <span>{gameState.gameScores[1]} punkti</span>
+          <span className="score-value">{gameState.gameScores[1]} punkti</span>
         </div>
+
+        {showCurrentPoints && (
+          <div className="current-trick-points">
+            <h4>Tihipunktid:</h4>
+            <div className="trick-points-row">
+              <span>Meeskond 1:</span>
+              <span className="points-value">{currentPoints[0]}</span>
+            </div>
+            <div className="trick-points-row">
+              <span>Meeskond 2:</span>
+              <span className="points-value">{currentPoints[1]}</span>
+            </div>
+          </div>
+        )}
+
         {gameState.phase === GAME_PHASES.ROUND_END && (
           <div className="round-scores">
             <h4>Voor lõppes:</h4>
@@ -212,12 +246,13 @@ export default function GameBoard() {
       {renderTrumpChoice()}
 
       <div className="players-layout">
-        {/* Top player */}
+        {/* Top player (Partner) */}
         <div className="player-position top">
           <Hand
             cards={gameState.hands[2]}
             playerName={PLAYER_NAMES[2]}
             isCurrentPlayer={gameState.currentPlayer === 2}
+            hidden={true}
           />
         </div>
 
@@ -227,6 +262,7 @@ export default function GameBoard() {
             cards={gameState.hands[1]}
             playerName={PLAYER_NAMES[1]}
             isCurrentPlayer={gameState.currentPlayer === 1}
+            hidden={true}
           />
         </div>
 
@@ -235,6 +271,7 @@ export default function GameBoard() {
             cards={gameState.hands[3]}
             playerName={PLAYER_NAMES[3]}
             isCurrentPlayer={gameState.currentPlayer === 3}
+            hidden={true}
           />
         </div>
 
@@ -246,6 +283,7 @@ export default function GameBoard() {
             canPlay={gameState.phase === GAME_PHASES.PLAYING}
             playerName={PLAYER_NAMES[0]}
             isCurrentPlayer={gameState.currentPlayer === 0}
+            hidden={false}
           />
         </div>
       </div>
