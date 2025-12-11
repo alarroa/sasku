@@ -16,11 +16,26 @@
   backdrop-filter: blur(10px);
 }
 
-.game-info {
+.main-layout {
   display: flex;
   gap: 30px;
-  justify-content: center;
-  margin-bottom: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+.sidebar-left {
+  flex-shrink: 0;
+  width: 250px;
+  position: sticky;
+  top: 20px;
+}
+
+.game-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .scores {
@@ -28,23 +43,115 @@
   padding: 15px;
   border-radius: 8px;
   backdrop-filter: blur(10px);
+  min-width: 200px;
 }
 
 .scores h3 {
   margin-top: 0;
   margin-bottom: 10px;
+  text-align: center;
 }
 
-.score-row {
-  display: flex;
-  justify-content: space-between;
+.trump-indicator {
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  background: rgba(76, 175, 80, 0.15);
+  border-radius: 6px;
+  border: 1px solid rgba(76, 175, 80, 0.4);
+}
+
+.trump-suit {
+  color: #4CAF50;
+  font-size: 18px;
+  text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+.score-table {
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  line-height: 1.6;
+  text-align: center;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.score-table::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.3) 5%,
+    rgba(255, 255, 255, 0.3) 95%,
+    transparent
+  );
+}
+
+.score-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 8px 0;
+  font-weight: bold;
+  font-size: 16px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+  position: relative;
+}
+
+.score-team {
+  text-align: center;
+}
+
+.score-separator {
+  display: none;
+}
+
+.score-marks {
+  min-height: 60px;
+  padding: 10px 0;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.score-row-marks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 20px;
   margin: 5px 0;
 }
 
-.score-value {
+.score-mark {
+  text-align: center;
+  font-size: 22px;
   font-weight: bold;
-  font-size: 18px;
+  color: #4CAF50;
+  min-height: 28px;
+  letter-spacing: -2px;
+  text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+.score-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 8px 0;
+  font-weight: bold;
+  font-size: 22px;
+  color: #FFD700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.score-total {
+  text-align: center;
 }
 
 .current-trick-points {
@@ -91,15 +198,6 @@
 
 .round-scores button:hover {
   background: #45a049;
-}
-
-.trump-info {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 15px;
-  border-radius: 8px;
-  backdrop-filter: blur(10px);
-  font-size: 18px;
-  font-weight: bold;
 }
 
 .current-trick {
@@ -315,6 +413,12 @@
   background: #f0f0f0;
 }
 
+.final-score {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 15px 0;
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .game-board {
@@ -326,9 +430,20 @@
     padding: 10px;
   }
 
-  .game-info {
-    flex-direction: column;
-    gap: 10px;
+  .main-layout {
+    flex-direction: column-reverse;
+    gap: 20px;
+  }
+
+  .sidebar-left {
+    width: 100%;
+    position: static;
+    order: 2;
+  }
+
+  .game-area {
+    width: 100%;
+    order: 1;
   }
 
   .scores {
@@ -338,11 +453,6 @@
 
   .scores h3 {
     font-size: 16px;
-  }
-
-  .trump-info {
-    padding: 10px;
-    font-size: 14px;
   }
 
   .player-hand-container {

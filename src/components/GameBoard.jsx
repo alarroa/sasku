@@ -42,7 +42,8 @@ export default function GameBoard() {
         if (gameState.trumpMaker === playerIndex && !gameState.trumpSuit) {
           const trump = chooseAITrump(gameState, playerIndex);
           setMessage(`${PLAYER_NAMES[playerIndex]} valis trumpiks ${SUIT_NAMES_ET[trump]}`);
-          setGameState(chooseTrump(gameState, trump));
+          const newState = chooseTrump(gameState, trump);
+          setGameState(newState);
         } else {
           const bid = makeAIBid(gameState, playerIndex);
           if (bid !== null) {
@@ -263,31 +264,72 @@ export default function GameBoard() {
     return teamPoints;
   };
 
+  const convertScoreToMarks = (score) => {
+    const marks = [];
+    let remaining = score;
+
+    while (remaining >= 4) {
+      marks.push('#');
+      remaining -= 4;
+    }
+    while (remaining >= 2) {
+      marks.push('||');
+      remaining -= 2;
+    }
+
+    return marks;
+  };
+
   const renderScores = () => {
     const currentPoints = calculateCurrentTrickPoints();
     const showCurrentPoints = gameState.phase === GAME_PHASES.PLAYING && gameState.tricksWon.some(t => t.length > 0);
 
+    const ourMarks = convertScoreToMarks(gameState.gameScores[0]);
+    const theirMarks = convertScoreToMarks(gameState.gameScores[1]);
+    const maxRows = Math.max(ourMarks.length, theirMarks.length, 1);
+
     return (
       <div className="scores">
-        <h3>Mänguseis:</h3>
-        <div className="score-row">
-          <span>Meeskond 1 (Sina & Partner):</span>
-          <span className="score-value">{gameState.gameScores[0]} punkti</span>
-        </div>
-        <div className="score-row">
-          <span>Meeskond 2:</span>
-          <span className="score-value">{gameState.gameScores[1]} punkti</span>
+        <h3>Mänguseis (16-ni):</h3>
+        {gameState.trumpSuit && (
+          <div className="trump-indicator">
+            Trump: <span className="trump-suit">{SUIT_NAMES_ET[gameState.trumpSuit]}</span>
+          </div>
+        )}
+        <div className="score-table">
+          <div className="score-header">
+            <div className="score-team">Meie</div>
+            <div className="score-team">Teie</div>
+          </div>
+          <div className="score-marks">
+            {Array.from({ length: maxRows }).map((_, index) => (
+              <div key={index} className="score-row-marks">
+                <div className="score-mark">{ourMarks[index] || ''}</div>
+                <div className="score-mark">{theirMarks[index] || ''}</div>
+              </div>
+            ))}
+            {maxRows === 0 && (
+              <div className="score-row-marks">
+                <div className="score-mark"></div>
+                <div className="score-mark"></div>
+              </div>
+            )}
+          </div>
+          <div className="score-totals">
+            <div className="score-total">{gameState.gameScores[0]}</div>
+            <div className="score-total">{gameState.gameScores[1]}</div>
+          </div>
         </div>
 
         {showCurrentPoints && (
           <div className="current-trick-points">
             <h4>Tihipunktid:</h4>
             <div className="trick-points-row">
-              <span>Meeskond 1:</span>
+              <span>Meie:</span>
               <span className="points-value">{currentPoints[0]}</span>
             </div>
             <div className="trick-points-row">
-              <span>Meeskond 2:</span>
+              <span>Teie:</span>
               <span className="points-value">{currentPoints[1]}</span>
             </div>
           </div>
@@ -296,8 +338,8 @@ export default function GameBoard() {
         {gameState.phase === GAME_PHASES.ROUND_END && (
           <div className="round-scores">
             <h4>Voor lõppes:</h4>
-            <div>Meeskond 1: {gameState.roundScores[0]} tihipunkti</div>
-            <div>Meeskond 2: {gameState.roundScores[1]} tihipunkti</div>
+            <div>Meie: {gameState.roundScores[0]} tihipunkti</div>
+            <div>Teie: {gameState.roundScores[1]} tihipunkti</div>
             <button onClick={handleNewRound}>Järgmine voor</button>
           </div>
         )}
@@ -308,12 +350,15 @@ export default function GameBoard() {
   const renderGameEnd = () => {
     if (gameState.phase !== GAME_PHASES.GAME_END) return null;
 
-    const winner = gameState.gameScores[0] >= 12 ? 'Meeskond 1 (Sina & Partner)' : 'Meeskond 2';
+    const winner = gameState.gameScores[0] >= 16 ? 'Meie' : 'Teie';
 
     return (
       <div className="game-end">
         <h2>Mäng läbi!</h2>
         <p>Võitja: {winner}</p>
+        <p className="final-score">
+          Meie: {gameState.gameScores[0]} - Teie: {gameState.gameScores[1]}
+        </p>
         <button onClick={() => setGameState(createInitialState())}>Uus mäng</button>
       </div>
     );
@@ -323,32 +368,33 @@ export default function GameBoard() {
     <div className="game-board">
       <div className="message-bar">{message}</div>
 
-      <div className="game-info">
-        {renderScores()}
-        {gameState.trumpSuit && (
-          <div className="trump-info">
-            Trump: {SUIT_NAMES_ET[gameState.trumpSuit]}
+      <div className="main-layout">
+        {/* Left sidebar with scores */}
+        <div className="sidebar-left">
+          {renderScores()}
+        </div>
+
+        {/* Main game area */}
+        <div className="game-area">
+          {renderGameEnd()}
+          {renderCurrentTrick()}
+          {renderBiddingControls()}
+          {renderTrumpChoice()}
+
+          {/* Player's hand */}
+          <div className="player-hand-container">
+            <Hand
+              cards={gameState.hands[0]}
+              onCardClick={handleCardPlay}
+              canPlay={gameState.phase === GAME_PHASES.PLAYING}
+              playerName={PLAYER_NAMES[0]}
+              isCurrentPlayer={gameState.currentPlayer === 0}
+              hidden={false}
+              trumpSuit={gameState.trumpSuit}
+              canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
+            />
           </div>
-        )}
-      </div>
-
-      {renderGameEnd()}
-      {renderCurrentTrick()}
-      {renderBiddingControls()}
-      {renderTrumpChoice()}
-
-      {/* Player's hand */}
-      <div className="player-hand-container">
-        <Hand
-          cards={gameState.hands[0]}
-          onCardClick={handleCardPlay}
-          canPlay={gameState.phase === GAME_PHASES.PLAYING}
-          playerName={PLAYER_NAMES[0]}
-          isCurrentPlayer={gameState.currentPlayer === 0}
-          hidden={false}
-          trumpSuit={gameState.trumpSuit}
-          canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
-        />
+        </div>
       </div>
     </div>
   );

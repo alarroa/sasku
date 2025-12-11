@@ -179,7 +179,15 @@ export function canPlayCard(state, playerIndex, card) {
       // Must play same suit if have it
       return !card.isPicture && card.suit === leadCard.suit;
     }
-    // If don't have the suit, can play anything
+
+    // Don't have the suit - must play trump (picture or trump suit) if have any
+    const hasTrump = hand.some(c => c.isPicture || c.suit === trumpSuit);
+    if (hasTrump) {
+      // Must play trump (picture or trump suit)
+      return card.isPicture || card.suit === trumpSuit;
+    }
+
+    // Don't have suit, trump, or pictures - can play anything
     return true;
   }
 }
@@ -376,8 +384,8 @@ function calculateRoundScore(state) {
     }
   }
 
-  // Check for game end (12 points)
-  if (state.gameScores[0] >= 12 || state.gameScores[1] >= 12) {
+  // Check for game end (16 points)
+  if (state.gameScores[0] >= 16 || state.gameScores[1] >= 16) {
     state.phase = GAME_PHASES.GAME_END;
   }
 }

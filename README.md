@@ -119,9 +119,10 @@ Ehitatud failid on `dist/` kaustas.
    - Kui sul pole ühtegi trumpi ega pilti, võid mängida mis tahes kaardi
 
 2. **Kui alustatakse mitte-trumpi tavalise kaardiga:**
-   - Pead järgima masti, kui sul on
-   - Pole kohustust ülbi lüüa
-   - Kui sul pole seda masti, võid mängida mis tahes kaardi (sh pilte/trumpi)
+   - Pead järgima masti, kui sul on (ei pea ülbi lööma)
+   - Kui sul pole seda masti:
+     - Pead mängima pildi VÕI trumpi, kui sul on
+     - Ainult kui sul pole pilti EGA trumpi, võid mängida teisi maste
 
 3. **TÄHTIS:** Trumpi (pilt või trumpimasti kaart) peab alati ülbi lööma, kui võimalik!
 
@@ -162,7 +163,23 @@ Ehitatud failid on `dist/` kaustas.
    - **Kokku maksimaalselt:** 4+2+2 = **8 punkti** (ruutu) või 2+2+2 = **6 punkti** (muud)
 
 #### Mängu võit
-- Esimene meeskond, kes kogub **12 punkti**, võidab mängu
+- Esimene meeskond, kes kogub **16 punkti**, võidab mängu
+
+#### Punktide visualiseerimine
+- Punktid kuvatakse tulbana kriipsudena:
+  - **||** = 2 punkti
+  - **#** = 4 punkti
+- Näide:
+  ```
+  Meie | Teie
+  ―――――――
+  #    | #
+  #    | #
+  #    | ||
+  #    |
+  ―――――――
+  16   | 10
+  ```
 
 ### Muudetavad parameetrid
 
@@ -174,7 +191,7 @@ Koodis saad muuta:
 - Trump võit: 2 punkti (muud) / 4 punkti (ruutu)
 - Trump löödud: 2 punkti (muud) / 4 punkti (ruutu) + 2 punkti beenus
 - Jänni boonus: +2 punkti (alla 30 punkti)
-- Võiduks vajalik: 12 punkti
+- Võiduks vajalik: **16 punkti**
 
 **AI strateegia** (`ai.js`):
 - Pakkumise lävend (rida 18): `maxPossibleBid >= 7`
