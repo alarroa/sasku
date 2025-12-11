@@ -135,6 +135,33 @@
   font-weight: bold;
 }
 
+.completed-trick {
+  background: rgba(76, 175, 80, 0.15) !important;
+  border: 2px solid rgba(76, 175, 80, 0.5);
+}
+
+.completed-trick h3 {
+  color: #4CAF50;
+}
+
+.trick-card.winner {
+  position: relative;
+}
+
+.trick-card.winner::after {
+  content: '👑';
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 24px;
+  animation: bounce 0.5s ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
 .bidding-controls {
   background: rgba(255, 255, 255, 0.1);
   padding: 20px;
@@ -173,6 +200,25 @@
   background: #1976D2;
 }
 
+.ruutu-button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #E91E63 0%, #9C27B0 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  min-width: 80px;
+  margin-left: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.ruutu-button:hover {
+  background: linear-gradient(135deg, #C2185B 0%, #7B1FA2 100%);
+  transform: scale(1.05);
+}
+
 .pass-button {
   padding: 10px 30px;
   background: #f44336;
@@ -182,6 +228,7 @@
   cursor: pointer;
   font-size: 16px;
   font-weight: bold;
+  margin-top: 10px;
 }
 
 .pass-button:hover {
@@ -222,6 +269,13 @@
 
 .trump-buttons button:hover {
   background: #7B1FA2;
+}
+
+.trump-hint {
+  margin-top: 10px;
+  font-size: 14px;
+  opacity: 0.9;
+  color: #fff;
 }
 
 .player-hand-container {

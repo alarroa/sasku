@@ -37,20 +37,27 @@ export function chooseAITrump(state, playerIndex) {
     suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1;
   });
 
-  // Choose longest suit, prefer stronger suits in case of tie
-  const suitOrder = [SUITS.CLUBS, SUITS.SPADES, SUITS.HEARTS, SUITS.DIAMONDS];
-  let bestSuit = SUITS.DIAMONDS;
-  let bestCount = 0;
+  // Find the longest suit(s) - these are valid trump choices
+  const maxSuitCount = Math.max(0, ...Object.values(suitCounts));
+  const validSuits = Object.keys(suitCounts).filter(suit =>
+    suitCounts[suit] === maxSuitCount
+  );
 
+  // Diamonds can always be chosen
+  if (!validSuits.includes(SUITS.DIAMONDS)) {
+    validSuits.push(SUITS.DIAMONDS);
+  }
+
+  // Choose the strongest valid suit
+  const suitOrder = [SUITS.CLUBS, SUITS.SPADES, SUITS.HEARTS, SUITS.DIAMONDS];
   for (const suit of suitOrder) {
-    const count = suitCounts[suit] || 0;
-    if (count > bestCount) {
-      bestCount = count;
-      bestSuit = suit;
+    if (validSuits.includes(suit)) {
+      return suit;
     }
   }
 
-  return bestSuit;
+  // Fallback to diamonds
+  return SUITS.DIAMONDS;
 }
 
 // AI card playing logic

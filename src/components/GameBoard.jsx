@@ -10,7 +10,8 @@ import {
   passBid,
   chooseTrump,
   startNewRound,
-  getTeam
+  getTeam,
+  getNextPlayer
 } from '../game/gameState';
 import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
 import { SUITS, SUIT_NAMES_ET, calculateBiddingValue } from '../game/cards';
@@ -25,6 +26,13 @@ export default function GameBoard() {
   // AI turn handling
   useEffect(() => {
     if (gameState.currentPlayer === 0) return; // Human player
+
+    // If trick just completed (4 cards), wait longer to show the result
+    const trickJustCompleted = gameState.lastTrick &&
+                               gameState.lastTrick.trick.length === 4 &&
+                               gameState.currentTrick.length === 0;
+
+    const delay = trickJustCompleted ? 2500 : 600; // 2.5s for completed trick, 600ms normally
 
     const timer = setTimeout(() => {
       const playerIndex = gameState.currentPlayer;
@@ -49,10 +57,18 @@ export default function GameBoard() {
         const card = chooseAICard(gameState, playerIndex);
         if (card) {
           setMessage(`${PLAYER_NAMES[playerIndex]} mängis kaardi`);
-          setGameState(playCard(gameState, playerIndex, card));
+          const newState = playCard(gameState, playerIndex, card);
+
+          // If trick is now complete, show who won
+          if (newState.lastTrick) {
+            const winner = newState.lastTrick.winner;
+            setMessage(`${PLAYER_NAMES[winner]} võitis tihi!`);
+          }
+
+          setGameState(newState);
         }
       }
-    }, 1000);
+    }, delay);
 
     return () => clearTimeout(timer);
   }, [gameState]);
@@ -83,12 +99,36 @@ export default function GameBoard() {
 
     setMessage('Sa mängisid kaardi');
     const newState = playCard(gameState, 0, card);
+
+    // If trick is now complete, show who won
+    if (newState.lastTrick) {
+      const winner = newState.lastTrick.winner;
+      setMessage(`${PLAYER_NAMES[winner]} võitis tihi!`);
+    }
+
     setGameState(newState);
   };
 
   const handleNewRound = () => {
     setMessage('Uus voor algas!');
     setGameState(startNewRound(gameState));
+  };
+
+  const handleRuutuBid = () => {
+    setMessage('Valisid Ruudu trumpiks');
+    // Automatically bid and choose diamonds as trump
+    const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
+    const newBid = currentHighBid + 1;
+
+    const newState = { ...gameState };
+    newState.bids = [...gameState.bids];
+    newState.bids[0] = newBid;
+    newState.trumpMaker = 0;
+    newState.trumpSuit = SUITS.DIAMONDS;
+    newState.phase = GAME_PHASES.PLAYING;
+    newState.leadPlayer = getNextPlayer(newState.dealer);
+    newState.currentPlayer = newState.leadPlayer;
+    setGameState(newState);
   };
 
   const renderBiddingControls = () => {
@@ -113,6 +153,9 @@ export default function GameBoard() {
               {bid}
             </button>
           ))}
+          <button className="ruutu-button" onClick={handleRuutuBid} title="Paku kohe ruudu trumpiga (4 punkti võites)">
+            Ruutu ♦
+          </button>
         </div>
         <button className="pass-button" onClick={handlePass}>Pass</button>
       </div>
@@ -124,36 +167,84 @@ export default function GameBoard() {
     if (gameState.trumpMaker !== 0) return null; // Not our turn to choose
     if (gameState.trumpMaker === null) return null; // No trump maker yet
 
+    // Calculate valid trump suits based on the hand
+    const hand = gameState.hands[0];
+    const pictures = hand.filter(c => c.isPicture).length;
+
+    // Count cards by suit (excluding pictures)
+    const suitCounts = {};
+    hand.filter(c => !c.isPicture).forEach(c => {
+      suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+    });
+
+    // Find the longest suit(s)
+    const maxSuitCount = Math.max(0, ...Object.values(suitCounts));
+    const validSuits = Object.keys(suitCounts).filter(suit =>
+      suitCounts[suit] === maxSuitCount
+    );
+
+    // Diamonds can always be chosen
+    if (!validSuits.includes(SUITS.DIAMONDS)) {
+      validSuits.push(SUITS.DIAMONDS);
+    }
+
     return (
       <div className="trump-choice">
         <h3>Vali trump:</h3>
         <div className="trump-buttons">
-          {Object.entries(SUIT_NAMES_ET).map(([suit, name]) => (
-            <button key={suit} onClick={() => handleTrumpChoice(suit)}>
-              {name}
-            </button>
-          ))}
+          {Object.entries(SUIT_NAMES_ET)
+            .filter(([suit]) => validSuits.includes(suit))
+            .map(([suit, name]) => (
+              <button key={suit} onClick={() => handleTrumpChoice(suit)}>
+                {name}
+              </button>
+            ))}
         </div>
+        <p className="trump-hint">
+          Võid valida: {validSuits.map(s => SUIT_NAMES_ET[s]).join(', ')}
+          {validSuits.includes(SUITS.DIAMONDS) && ' (Ruutu alati lubatud)'}
+        </p>
       </div>
     );
   };
 
   const renderCurrentTrick = () => {
-    if (gameState.currentTrick.length === 0) return null;
-
-    return (
-      <div className="current-trick">
-        <h3>Praegune tihi:</h3>
-        <div className="trick-cards">
-          {gameState.currentTrick.map((play, index) => (
-            <div key={index} className="trick-card">
-              <div className="trick-player">{PLAYER_NAMES[play.player]}</div>
-              <Card card={play.card} trumpSuit={gameState.trumpSuit} />
-            </div>
-          ))}
+    // Show current trick if cards are being played
+    if (gameState.currentTrick.length > 0) {
+      return (
+        <div className="current-trick">
+          <h3>Praegune tihi:</h3>
+          <div className="trick-cards">
+            {gameState.currentTrick.map((play, index) => (
+              <div key={index} className="trick-card">
+                <div className="trick-player">{PLAYER_NAMES[play.player]}</div>
+                <Card card={play.card} trumpSuit={gameState.trumpSuit} />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+
+    // Show last completed trick briefly (for 2.5 seconds after completion)
+    if (gameState.lastTrick && gameState.lastTrick.trick.length === 4) {
+      const winner = gameState.lastTrick.winner;
+      return (
+        <div className="current-trick completed-trick">
+          <h3>Tihi võitis: {PLAYER_NAMES[winner]} 🏆</h3>
+          <div className="trick-cards">
+            {gameState.lastTrick.trick.map((play, index) => (
+              <div key={index} className={`trick-card ${play.player === winner ? 'winner' : ''}`}>
+                <div className="trick-player">{PLAYER_NAMES[play.player]}</div>
+                <Card card={play.card} trumpSuit={gameState.trumpSuit} />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   const calculateCurrentTrickPoints = () => {

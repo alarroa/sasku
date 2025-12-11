@@ -343,34 +343,35 @@ function calculateRoundScore(state) {
   // Üleküla ruutu (no trump maker)
   if (trumpMakerTeam === null) {
     if (teamPoints[0] > teamPoints[1]) {
-      state.gameScores[0] += 1;
+      state.gameScores[0] += 2;
     } else if (teamPoints[1] > teamPoints[0]) {
-      state.gameScores[1] += 1;
+      state.gameScores[1] += 2;
     }
     // Pokk (tie) - no points, play again
   } else {
     const trumpMakerPoints = teamPoints[trumpMakerTeam];
     const defenderPoints = teamPoints[1 - trumpMakerTeam];
 
-    // Check for karvane (one team got no tricks)
+    // Check for karvane (one team got all tricks)
     const trumpMakerTricks = state.tricksWon[state.trumpMaker].length +
                              state.tricksWon[getPartner(state.trumpMaker)].length;
 
     if (trumpMakerTricks === 9) {
-      // Trump maker got all tricks
+      // Trump maker got all tricks (karvane)
       state.gameScores[trumpMakerTeam] += 6;
     } else if (trumpMakerTricks === 0) {
-      // Defenders got all tricks
+      // Defenders got all tricks (karvane)
       state.gameScores[1 - trumpMakerTeam] += 6;
     } else if (trumpMakerPoints >= 61) {
       // Trump maker won
-      let points = state.trumpSuit === SUITS.DIAMONDS ? 2 : 1;
-      if (defenderPoints < 31) points += 1; // Jänn
+      let points = state.trumpSuit === SUITS.DIAMONDS ? 4 : 2;
+      if (defenderPoints < 30) points += 2; // Jänn
       state.gameScores[trumpMakerTeam] += points;
     } else {
       // Trump was beaten
       let points = state.trumpSuit === SUITS.DIAMONDS ? 4 : 2;
-      if (trumpMakerPoints < 31) points += 1; // Jänn
+      points += 2; // Bonus for beating opponent's trump
+      if (trumpMakerPoints < 30) points += 2; // Jänn
       state.gameScores[1 - trumpMakerTeam] += points;
     }
   }

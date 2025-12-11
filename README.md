@@ -87,6 +87,11 @@ Ehitatud failid on `dist/` kaustas.
 #### 2. Trumpi valimine
 
 - Pakkumise võitnud mängija valib trumpimasti
+- **Saad valida ainult neid maste, mis vastavad sinu pakkumisele**
+  - Näide: Pakud 7, sul on 4 pilti + 3 risti + 1 poti + 1 ärtu → saad valida ainult risti
+  - Kui on mitu sama pikkusega masti, võid valida nende seast
+- **Erireegel: Ruutu saab ALATI valida** (olenemata pakkumisest)
+- **"Ruutu" nupp pakkumise ajal:** Paku automaatselt ja vali kohe ruutu trump (saad 4 punkti võites)
 - Trump kehtib kogu vooru
 - Pildid on alati trumbid (olenemata valitud mastist)
 
@@ -138,7 +143,7 @@ Ehitatud failid on `dist/` kaustas.
 #### Võidu määramine
 
 **Üleküla ruutu (kõik passisid):**
-- Rohkem punkte kogunud meeskond saab **1 punkti**
+- Rohkem punkte kogunud meeskond saab **2 punkti**
 - Viik (pokk) → mõlemad 0 punkti, mäng uuesti
 
 **Normaalne mäng (keegi pakkus):**
@@ -147,12 +152,14 @@ Ehitatud failid on `dist/` kaustas.
    - Saab **6 punkti**
 
 2. **Trump võitis** (trumpi tegija meeskond sai ≥61 punkti):
-   - **1 punkt** (või 2 punkti kui trump oli ruutu)
-   - **+1 punkt (Jänn)** kui vastane sai <31 punkti
+   - **2 punkti** (või 4 punkti kui trump oli ruutu)
+   - **+2 punkti (Jänn)** kui vastane sai alla 30 punkti
 
 3. **Trump kaotati** (trumpi tegija meeskond sai <61 punkti):
-   - Vastane saab **2 punkti** (või 4 punkti kui trump oli ruutu)
-   - **+1 punkt (Jänn)** kui trumpi tegija sai <31 punkti
+   - Vastane saab **4 punkti** (ruutu) või **2 punkti** (muud mastid)
+   - **+2 punkti beenus** trumpi ülelöömise eest
+   - **+2 punkti (Jänn)** kui trumpi tegija sai alla 30 punkti
+   - **Kokku maksimaalselt:** 4+2+2 = **8 punkti** (ruutu) või 2+2+2 = **6 punkti** (muud)
 
 #### Mängu võit
 - Esimene meeskond, kes kogub **12 punkti**, võidab mängu
@@ -161,11 +168,12 @@ Ehitatud failid on `dist/` kaustas.
 
 Koodis saad muuta:
 
-**Punktisüsteem** (`gameState.js`, rida 267-324):
-- Karvane: praegu 6 punkti
-- Normaalne võit: 1-2 punkti
-- Trump löödud: 2-4 punkti
-- Jänni boonus: +1 punkt
+**Punktisüsteem** (`gameState.js`, rida 325-383):
+- Üleküla ruutu: 2 punkti
+- Karvane: 6 punkti
+- Trump võit: 2 punkti (muud) / 4 punkti (ruutu)
+- Trump löödud: 2 punkti (muud) / 4 punkti (ruutu) + 2 punkti beenus
+- Jänni boonus: +2 punkti (alla 30 punkti)
 - Võiduks vajalik: 12 punkti
 
 **AI strateegia** (`ai.js`):
