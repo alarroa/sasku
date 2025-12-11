@@ -63,6 +63,7 @@ export function chooseAICard(state, playerIndex) {
 
   const isLeading = state.currentTrick.length === 0;
   const partner = (playerIndex + 2) % 4;
+  const team = playerIndex % 2;
 
   if (isLeading) {
     // Leading: try to play a strong card or low card
@@ -78,26 +79,33 @@ export function chooseAICard(state, playerIndex) {
     // Otherwise play lowest card
     return legalCards[legalCards.length - 1];
   } else {
-    // Following: try to win or play low
+    // Following: smart play based on who's winning
     const currentWinner = getCurrentTrickWinner(state);
-
-    // If partner is winning, play low
-    if (currentWinner === partner) {
-      return legalCards[legalCards.length - 1];
-    }
+    const winnerTeam = currentWinner % 2;
+    const ourTeamIsWinning = winnerTeam === team;
 
     // Try to win the trick
-    // Play highest card that can win
     const winningCards = legalCards.filter(card =>
       canWinTrick(state, card, playerIndex)
     );
 
     if (winningCards.length > 0) {
-      return winningCards[0]; // First (highest) winning card
+      // We can win - play the highest winning card
+      return winningCards[0];
     }
 
-    // Can't win - play lowest card
-    return legalCards[legalCards.length - 1];
+    // Can't win the trick
+    if (ourTeamIsWinning) {
+      // Partner/teammate is winning - add high points!
+      // Sort by points (descending) and play the highest point card
+      const sortedByPoints = [...legalCards].sort((a, b) => b.points - a.points);
+      return sortedByPoints[0];
+    } else {
+      // Opponent is winning - play lowest card to save points
+      // Sort by points (ascending) and play the lowest point card
+      const sortedByPoints = [...legalCards].sort((a, b) => a.points - b.points);
+      return sortedByPoints[0];
+    }
   }
 }
 
