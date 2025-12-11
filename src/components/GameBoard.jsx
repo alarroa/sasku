@@ -13,7 +13,7 @@ import {
   getTeam
 } from '../game/gameState';
 import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
-import { SUITS, SUIT_NAMES_ET } from '../game/cards';
+import { SUITS, SUIT_NAMES_ET, calculateBiddingValue } from '../game/cards';
 import './GameBoard.css';
 
 const PLAYER_NAMES = ['Sina', 'Mängija 2', 'Partner', 'Mängija 4'];
@@ -97,9 +97,10 @@ export default function GameBoard() {
     if (gameState.trumpMaker !== null) return null; // Trump maker chosen, don't show bidding
 
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
+    const maxPossibleBid = calculateBiddingValue(gameState.hands[0]);
     const possibleBids = [];
 
-    for (let i = currentHighBid + 1; i <= 18; i++) {
+    for (let i = currentHighBid + 1; i <= maxPossibleBid; i++) {
       possibleBids.push(i);
     }
 
@@ -246,35 +247,6 @@ export default function GameBoard() {
       {renderTrumpChoice()}
 
       <div className="players-layout">
-        {/* Top player (Partner) */}
-        <div className="player-position top">
-          <Hand
-            cards={gameState.hands[2]}
-            playerName={PLAYER_NAMES[2]}
-            isCurrentPlayer={gameState.currentPlayer === 2}
-            hidden={true}
-          />
-        </div>
-
-        {/* Left and Right players */}
-        <div className="player-position left">
-          <Hand
-            cards={gameState.hands[1]}
-            playerName={PLAYER_NAMES[1]}
-            isCurrentPlayer={gameState.currentPlayer === 1}
-            hidden={true}
-          />
-        </div>
-
-        <div className="player-position right">
-          <Hand
-            cards={gameState.hands[3]}
-            playerName={PLAYER_NAMES[3]}
-            isCurrentPlayer={gameState.currentPlayer === 3}
-            hidden={true}
-          />
-        </div>
-
         {/* Bottom player (human) */}
         <div className="player-position bottom">
           <Hand

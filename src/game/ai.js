@@ -4,19 +4,24 @@ import { canPlayCard, canMakeBid } from './gameState.js';
 // Simple AI for bidding
 export function makeAIBid(state, playerIndex) {
   const hand = state.hands[playerIndex];
-  const biddingValue = calculateBiddingValue(hand);
+  const maxPossibleBid = calculateBiddingValue(hand);
 
   // Get current high bid
   const currentHighBid = Math.max(0, ...state.bids.filter(b => b !== null));
 
+  // Can't bid higher than max possible
+  if (currentHighBid >= maxPossibleBid) {
+    return null; // Pass
+  }
+
   // Bid if value is good enough and can outbid current
-  if (biddingValue >= 7 && canMakeBid(state, playerIndex, currentHighBid + 1)) {
+  if (maxPossibleBid >= 7 && canMakeBid(state, playerIndex, currentHighBid + 1)) {
     return currentHighBid + 1;
   }
 
   // Consider bidding with slightly lower value if no one has bid yet
-  if (currentHighBid === 0 && biddingValue >= 5) {
-    return Math.min(biddingValue, 10);
+  if (currentHighBid === 0 && maxPossibleBid >= 5) {
+    return Math.min(maxPossibleBid, 10);
   }
 
   return null; // Pass

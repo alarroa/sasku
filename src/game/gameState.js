@@ -1,4 +1,4 @@
-import { createDeck, shuffleDeck, dealCards, SUITS } from './cards.js';
+import { createDeck, shuffleDeck, dealCards, SUITS, calculateBiddingValue } from './cards.js';
 
 export const GAME_PHASES = {
   BIDDING: 'bidding',
@@ -58,7 +58,9 @@ export function canMakeBid(state, playerIndex, bid) {
   if (state.hasPassed[playerIndex]) return false;
 
   const currentHighBid = Math.max(0, ...state.bids.filter(b => b !== null));
-  return bid > currentHighBid;
+  const maxPossibleBid = calculateBiddingValue(state.hands[playerIndex]);
+
+  return bid > currentHighBid && bid <= maxPossibleBid;
 }
 
 export function makeBid(state, playerIndex, bid) {
