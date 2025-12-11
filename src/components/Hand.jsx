@@ -2,8 +2,8 @@ import Card from './Card';
 import { sortHand } from '../game/cards';
 import './Hand.css';
 
-export default function Hand({ cards, onCardClick, canPlay, playerName, isCurrentPlayer, hidden }) {
-  const sortedCards = sortHand(cards);
+export default function Hand({ cards, onCardClick, canPlay, playerName, isCurrentPlayer, hidden, trumpSuit, canPlayCardFn }) {
+  const sortedCards = sortHand(cards, trumpSuit);
 
   return (
     <div className={`hand ${isCurrentPlayer ? 'current-player' : ''} ${hidden ? 'hidden-hand' : ''}`}>
@@ -17,14 +17,20 @@ export default function Hand({ cards, onCardClick, canPlay, playerName, isCurren
             </div>
           ))
         ) : (
-          sortedCards.map((card) => (
-            <Card
-              key={card.id}
-              card={card}
-              onClick={onCardClick}
-              disabled={!canPlay || !isCurrentPlayer}
-            />
-          ))
+          sortedCards.map((card) => {
+            // Check if this specific card can be played
+            const cardCanBePlayed = canPlay && isCurrentPlayer && canPlayCardFn && canPlayCardFn(card);
+
+            return (
+              <Card
+                key={card.id}
+                card={card}
+                onClick={onCardClick}
+                disabled={!cardCanBePlayed}
+                trumpSuit={trumpSuit}
+              />
+            );
+          })
         )}
       </div>
     </div>

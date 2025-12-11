@@ -1,8 +1,9 @@
 import { SUIT_SYMBOLS, SUITS } from '../game/cards';
 import './Card.css';
 
-export default function Card({ card, onClick, selected, disabled }) {
+export default function Card({ card, onClick, selected, disabled, trumpSuit }) {
   const isRed = card.suit === SUITS.HEARTS || card.suit === SUITS.DIAMONDS;
+  const isTrump = card.isPicture || (trumpSuit && card.suit === trumpSuit);
 
   return (
     <div
@@ -11,7 +12,7 @@ export default function Card({ card, onClick, selected, disabled }) {
     >
       <div className="card-rank">{card.rank}</div>
       <div className="card-suit">{SUIT_SYMBOLS[card.suit]}</div>
-      {card.isPicture && <div className="picture-badge">T</div>}
+      {isTrump && <div className="picture-badge">T</div>}
     </div>
   );
 }

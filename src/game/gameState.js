@@ -134,29 +134,85 @@ export function canPlayCard(state, playerIndex, card) {
   if (state.currentTrick.length === 0) return true;
 
   const leadCard = state.currentTrick[0].card;
+  const trumpSuit = state.trumpSuit;
 
-  // Trumbi ülelöömise kohustust ei ole, masti kaotamine on lubatud
-  // This means: no obligation to beat trump/suit, you can throw away
+  // Check if lead card is trump (picture or trump suit)
+  const leadIsTrump = leadCard.isPicture || leadCard.suit === trumpSuit;
 
-  if (leadCard.isPicture) {
-    // If lead is picture, must play picture if have one
-    // BUT: no need to beat it - can play any picture
-    const hasPictures = hand.some(c => c.isPicture);
-    if (hasPictures && !card.isPicture) return false;
-    // If playing a picture, it's valid (no need to check if it beats lead)
-    if (card.isPicture) return true;
-    // If no pictures, can play anything
-    return !hasPictures;
+  if (leadIsTrump) {
+    // If lead is trump (picture or trump suit card)
+    // Must play trump if have one (picture or trump suit)
+    const trumpCards = hand.filter(c => c.isPicture || c.suit === trumpSuit);
+
+    if (trumpCards.length === 0) {
+      // No trump cards - can play anything
+      return true;
+    }
+
+    // Have trump cards - must play trump
+    const cardIsTrump = card.isPicture || card.suit === trumpSuit;
+    if (!cardIsTrump) return false;
+
+    // Find the current highest trump in the trick
+    let highestTrump = leadCard;
+    for (let i = 1; i < state.currentTrick.length; i++) {
+      const trickCard = state.currentTrick[i].card;
+      if (isCardStronger(trickCard, highestTrump, leadCard, trumpSuit)) {
+        highestTrump = trickCard;
+      }
+    }
+
+    // Check if we can beat the highest trump
+    const canBeat = trumpCards.some(c => isCardStronger(c, highestTrump, leadCard, trumpSuit));
+
+    if (canBeat) {
+      // Must beat if possible
+      return isCardStronger(card, highestTrump, leadCard, trumpSuit);
+    } else {
+      // Can't beat - can play any trump
+      return cardIsTrump;
+    }
   } else {
-    // If lead is non-picture, must follow suit if possible
+    // If lead is non-trump regular card, must follow suit if possible
     const hasSuit = hand.some(c => !c.isPicture && c.suit === leadCard.suit);
     if (hasSuit) {
-      // Must play same suit if have it, but can be any card of that suit
+      // Must play same suit if have it
       return !card.isPicture && card.suit === leadCard.suit;
     }
-    // If don't have the suit, can play anything (including pictures/trump)
+    // If don't have the suit, can play anything
     return true;
   }
+}
+
+// Helper function to check if card1 is stronger than card2
+function isCardStronger(card1, card2, leadCard, trumpSuit) {
+  // Both pictures
+  if (card1.isPicture && card2.isPicture) {
+    const rankCompare = compareRanks(card1.rank, card2.rank);
+    if (rankCompare !== 0) return rankCompare > 0;
+    return getSuitStrength(card1.suit) > getSuitStrength(card2.suit);
+  }
+
+  // card1 is picture, card2 is not
+  if (card1.isPicture) return true;
+  if (card2.isPicture) return false;
+
+  // Neither is picture
+  // Check trump
+  if (card1.suit === trumpSuit && card2.suit !== trumpSuit) return true;
+  if (card2.suit === trumpSuit && card1.suit !== trumpSuit) return false;
+
+  // Both trump or both not trump
+  if (card1.suit === card2.suit) {
+    return compareRanks(card1.rank, card2.rank) > 0;
+  }
+
+  // Different suits, neither trump
+  // Must follow lead suit
+  if (card1.suit === leadCard.suit) return true;
+  if (card2.suit === leadCard.suit) return false;
+
+  return false;
 }
 
 export function playCard(state, playerIndex, card) {

@@ -158,13 +158,31 @@ export function calculateBiddingValue(hand) {
 }
 
 // Sort hand for display
-export function sortHand(hand) {
+export function sortHand(hand, trumpSuit = null) {
   return [...hand].sort((a, b) => {
     // Pictures first
     if (a.isPicture && !b.isPicture) return -1;
     if (!a.isPicture && b.isPicture) return 1;
 
-    // If both pictures or both not pictures, sort by suit then rank
+    // If both pictures, sort by rank first (K > Q > J), then by suit
+    if (a.isPicture && b.isPicture) {
+      if (a.rank !== b.rank) {
+        return RANK_STRENGTH[b.rank] - RANK_STRENGTH[a.rank];
+      }
+      return SUIT_STRENGTH[b.suit] - SUIT_STRENGTH[a.suit];
+    }
+
+    // If both are regular cards
+    // Trump suit cards come first (after pictures)
+    if (trumpSuit) {
+      const aIsTrump = a.suit === trumpSuit;
+      const bIsTrump = b.suit === trumpSuit;
+
+      if (aIsTrump && !bIsTrump) return -1;
+      if (!aIsTrump && bIsTrump) return 1;
+    }
+
+    // Sort by suit then rank
     if (a.suit !== b.suit) {
       return SUIT_STRENGTH[b.suit] - SUIT_STRENGTH[a.suit];
     }

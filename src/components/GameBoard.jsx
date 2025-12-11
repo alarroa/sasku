@@ -148,7 +148,7 @@ export default function GameBoard() {
           {gameState.currentTrick.map((play, index) => (
             <div key={index} className="trick-card">
               <div className="trick-player">{PLAYER_NAMES[play.player]}</div>
-              <Card card={play.card} disabled={true} />
+              <Card card={play.card} trumpSuit={gameState.trumpSuit} />
             </div>
           ))}
         </div>
@@ -246,18 +246,18 @@ export default function GameBoard() {
       {renderBiddingControls()}
       {renderTrumpChoice()}
 
-      <div className="players-layout">
-        {/* Bottom player (human) */}
-        <div className="player-position bottom">
-          <Hand
-            cards={gameState.hands[0]}
-            onCardClick={handleCardPlay}
-            canPlay={gameState.phase === GAME_PHASES.PLAYING}
-            playerName={PLAYER_NAMES[0]}
-            isCurrentPlayer={gameState.currentPlayer === 0}
-            hidden={false}
-          />
-        </div>
+      {/* Player's hand */}
+      <div className="player-hand-container">
+        <Hand
+          cards={gameState.hands[0]}
+          onCardClick={handleCardPlay}
+          canPlay={gameState.phase === GAME_PHASES.PLAYING}
+          playerName={PLAYER_NAMES[0]}
+          isCurrentPlayer={gameState.currentPlayer === 0}
+          hidden={false}
+          trumpSuit={gameState.trumpSuit}
+          canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
+        />
       </div>
     </div>
   );

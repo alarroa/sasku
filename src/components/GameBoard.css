@@ -224,40 +224,11 @@
   background: #7B1FA2;
 }
 
-.players-layout {
-  position: relative;
-  width: 100%;
+.player-hand-container {
+  display: flex;
+  justify-content: center;
+  margin: 30px auto;
   max-width: 1200px;
-  height: 600px;
-  margin: 40px auto;
-}
-
-.player-position {
-  position: absolute;
-}
-
-.player-position.bottom {
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.player-position.top {
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.player-position.left {
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.player-position.right {
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 .game-end {
@@ -320,8 +291,7 @@
     font-size: 14px;
   }
 
-  .players-layout {
-    height: 500px;
+  .player-hand-container {
     margin: 20px auto;
   }
 
