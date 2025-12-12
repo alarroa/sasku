@@ -10,7 +10,7 @@
   justify-content: center;
   cursor: pointer;
   position: relative;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
   user-select: none;
 }
 
@@ -23,6 +23,17 @@
   transform: translateY(-15px);
   border-color: #4CAF50;
   box-shadow: 0 6px 12px rgba(76, 175, 80, 0.3);
+}
+
+.card.active {
+  border-color: #2196F3;
+  border-width: 3px;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
+}
+
+.card.active:hover {
+  transform: translateY(-12px);
+  box-shadow: 0 6px 12px rgba(33, 150, 243, 0.5);
 }
 
 .card.disabled {

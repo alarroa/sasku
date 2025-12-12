@@ -45,6 +45,19 @@ export default function GameBoard() {
     }
   }, [gameState]);
 
+  // Auto-pass if player has already passed during bidding
+  useEffect(() => {
+    if (gameState.phase === GAME_PHASES.BIDDING &&
+        gameState.currentPlayer === 0 &&
+        gameState.hasPassed[0]) {
+      // Player has already passed, skip their turn
+      const timer = setTimeout(() => {
+        setGameState(passBid(gameState, 0));
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState]);
+
   // AI turn handling
   useEffect(() => {
     if (gameState.currentPlayer === 0) return; // Human player
@@ -111,16 +124,6 @@ export default function GameBoard() {
 
   const handleNewRound = () => {
     setGameState(startNewRound(gameState));
-  };
-
-  const handleNewGame = () => {
-    // Clear localStorage and start fresh
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch (error) {
-      console.error('Failed to clear game state:', error);
-    }
-    setGameState(createInitialState());
   };
 
   const handleRuutuBid = () => {
@@ -471,18 +474,12 @@ export default function GameBoard() {
         <p className="final-score">
           {et.scoring.ourTeam}: {gameState.gameScores[0]} - {et.scoring.theirTeam}: {gameState.gameScores[1]}
         </p>
-        <button onClick={handleNewGame}>{et.gameEnd.newGame}</button>
       </div>
     );
   };
 
   return (
     <div className="game-board">
-      {/* New Game button - always visible */}
-      <button className="new-game-button" onClick={handleNewGame}>
-        {et.gameEnd.newGame}
-      </button>
-
       {renderGameEnd()}
       {renderPlayArea()}
 
@@ -496,6 +493,7 @@ export default function GameBoard() {
           hidden={false}
           trumpSuit={gameState.trumpSuit}
           canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
+          isBidding={gameState.phase === GAME_PHASES.BIDDING}
         />
       </div>
     </div>
