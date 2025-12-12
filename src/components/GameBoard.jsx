@@ -21,7 +21,6 @@ const PLAYER_NAMES = ['Sina', 'Mängija 2', 'Partner', 'Mängija 4'];
 
 export default function GameBoard() {
   const [gameState, setGameState] = useState(createInitialState());
-  const [message, setMessage] = useState('Uus mäng algas! Pakkumine käib.');
 
   // AI turn handling
   useEffect(() => {
@@ -41,31 +40,20 @@ export default function GameBoard() {
         // Check if this player needs to choose trump
         if (gameState.trumpMaker === playerIndex && !gameState.trumpSuit) {
           const trump = chooseAITrump(gameState, playerIndex);
-          setMessage(`${PLAYER_NAMES[playerIndex]} valis trumpiks ${SUIT_NAMES_ET[trump]}`);
           const newState = chooseTrump(gameState, trump);
           setGameState(newState);
         } else {
           const bid = makeAIBid(gameState, playerIndex);
           if (bid !== null) {
-            setMessage(`${PLAYER_NAMES[playerIndex]} pakkus ${bid}`);
             setGameState(makeBid(gameState, playerIndex, bid));
           } else {
-            setMessage(`${PLAYER_NAMES[playerIndex]} passis`);
             setGameState(passBid(gameState, playerIndex));
           }
         }
       } else if (gameState.phase === GAME_PHASES.PLAYING) {
         const card = chooseAICard(gameState, playerIndex);
         if (card) {
-          setMessage(`${PLAYER_NAMES[playerIndex]} mängis kaardi`);
           const newState = playCard(gameState, playerIndex, card);
-
-          // If trick is now complete, show who won
-          if (newState.lastTrick) {
-            const winner = newState.lastTrick.winner;
-            setMessage(`${PLAYER_NAMES[winner]} võitis tihi!`);
-          }
-
           setGameState(newState);
         }
       }
@@ -75,48 +63,34 @@ export default function GameBoard() {
   }, [gameState]);
 
   const handleBid = (bid) => {
-    setMessage(`Sa pakkusid ${bid}`);
     const newState = makeBid(gameState, 0, bid);
     setGameState(newState);
   };
 
   const handlePass = () => {
-    setMessage('Sa passisid');
     const newState = passBid(gameState, 0);
     setGameState(newState);
   };
 
   const handleTrumpChoice = (suit) => {
-    setMessage(`Trumbiks valiti ${SUIT_NAMES_ET[suit]}`);
     const newState = chooseTrump(gameState, suit);
     setGameState(newState);
   };
 
   const handleCardPlay = (card) => {
     if (!canPlayCard(gameState, 0, card)) {
-      setMessage('Seda kaarti ei saa mängida!');
       return;
     }
 
-    setMessage('Sa mängisid kaardi');
     const newState = playCard(gameState, 0, card);
-
-    // If trick is now complete, show who won
-    if (newState.lastTrick) {
-      const winner = newState.lastTrick.winner;
-      setMessage(`${PLAYER_NAMES[winner]} võitis tihi!`);
-    }
-
     setGameState(newState);
   };
 
   const handleNewRound = () => {
-    setMessage('Uus voor algas!');
     setGameState(startNewRound(gameState));
   };
 
   const handleRuutuBid = () => {
-    setMessage('Valisid Ruudu trumpiks');
     // Automatically bid and choose diamonds as trump
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
     const newBid = currentHighBid + 1;
@@ -168,8 +142,9 @@ export default function GameBoard() {
     if (gameState.trumpMaker !== 0) return null; // Not our turn to choose
     if (gameState.trumpMaker === null) return null; // No trump maker yet
 
-    // Calculate valid trump suits based on the hand
+    // Calculate valid trump suits based on the bid and hand
     const hand = gameState.hands[0];
+    const myBid = gameState.bids[0];
     const pictures = hand.filter(c => c.isPicture).length;
 
     // Count cards by suit (excluding pictures)
@@ -178,10 +153,11 @@ export default function GameBoard() {
       suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
     });
 
-    // Find the longest suit(s)
-    const maxSuitCount = Math.max(0, ...Object.values(suitCounts));
+    // Find all suits that allow the bid
+    // Bid = pictures + suit_count, so suit_count = bid - pictures
+    const requiredSuitCount = myBid - pictures;
     const validSuits = Object.keys(suitCounts).filter(suit =>
-      suitCounts[suit] === maxSuitCount
+      suitCounts[suit] >= requiredSuitCount
     );
 
     // Diamonds can always be chosen
@@ -202,50 +178,97 @@ export default function GameBoard() {
             ))}
         </div>
         <p className="trump-hint">
+          Pakkumine: {myBid} ({pictures} pilti + vähemalt {requiredSuitCount} masti)
+          <br />
           Võid valida: {validSuits.map(s => SUIT_NAMES_ET[s]).join(', ')}
-          {validSuits.includes(SUITS.DIAMONDS) && ' (Ruutu alati lubatud)'}
         </p>
       </div>
     );
   };
 
-  const renderCurrentTrick = () => {
-    // Show current trick if cards are being played
-    if (gameState.currentTrick.length > 0) {
-      return (
-        <div className="current-trick">
-          <h3>Praegune tihi:</h3>
-          <div className="trick-cards">
-            {gameState.currentTrick.map((play, index) => (
-              <div key={index} className="trick-card">
-                <div className="trick-player">{PLAYER_NAMES[play.player]}</div>
-                <Card card={play.card} trumpSuit={gameState.trumpSuit} />
-              </div>
-            ))}
-          </div>
-        </div>
-      );
+  const getPlayerStatus = (playerIndex) => {
+    const parts = [];
+
+    // Show bid or pass during bidding
+    if (gameState.phase === GAME_PHASES.BIDDING) {
+      if (gameState.hasPassed[playerIndex]) {
+        parts.push('Pass');
+      } else if (gameState.bids[playerIndex] !== null) {
+        parts.push(`${gameState.bids[playerIndex]}`);
+      }
     }
 
-    // Show last completed trick briefly (for 2.5 seconds after completion)
-    if (gameState.lastTrick && gameState.lastTrick.trick.length === 4) {
-      const winner = gameState.lastTrick.winner;
-      return (
-        <div className="current-trick completed-trick">
-          <h3>Tihi võitis: {PLAYER_NAMES[winner]} 🏆</h3>
-          <div className="trick-cards">
-            {gameState.lastTrick.trick.map((play, index) => (
-              <div key={index} className={`trick-card ${play.player === winner ? 'winner' : ''}`}>
-                <div className="trick-player">{PLAYER_NAMES[play.player]}</div>
-                <Card card={play.card} trumpSuit={gameState.trumpSuit} />
-              </div>
-            ))}
-          </div>
-        </div>
-      );
+    // Show trump suit name during playing for trump maker
+    if (gameState.phase === GAME_PHASES.PLAYING && gameState.trumpMaker === playerIndex && gameState.trumpSuit) {
+      parts.push(SUIT_NAMES_ET[gameState.trumpSuit]);
+    }
+
+    return parts.length > 0 ? ` (${parts.join(' ')})` : '';
+  };
+
+  const getPlayerCard = (playerIndex) => {
+    // Show cards from current trick (cards being played right now)
+    const play = gameState.currentTrick.find(p => p.player === playerIndex);
+    if (play) return play.card;
+
+    // Also show last completed trick (for the 2.5s delay or during round end)
+    if (gameState.lastTrick && (gameState.currentTrick.length === 0 || gameState.phase === GAME_PHASES.ROUND_END)) {
+      const lastPlay = gameState.lastTrick.trick.find(p => p.player === playerIndex);
+      if (lastPlay) return lastPlay.card;
     }
 
     return null;
+  };
+
+  const renderPlayArea = () => {
+    // Show play area during bidding, playing, and round end
+    const shouldShow = gameState.phase === GAME_PHASES.BIDDING ||
+                       gameState.phase === GAME_PHASES.PLAYING ||
+                       gameState.phase === GAME_PHASES.ROUND_END;
+
+    if (!shouldShow) return null;
+
+    const positions = [
+      { index: 0, className: 'player-bottom', name: PLAYER_NAMES[0] },
+      { index: 1, className: 'player-left', name: PLAYER_NAMES[1] },
+      { index: 2, className: 'player-top', name: PLAYER_NAMES[2] },
+      { index: 3, className: 'player-right', name: PLAYER_NAMES[3] }
+    ];
+
+    // Check if we're showing last trick
+    const showingLastTrick = (gameState.lastTrick && gameState.currentTrick.length === 0) ||
+                             gameState.phase === GAME_PHASES.ROUND_END;
+    const trickWinner = showingLastTrick ? gameState.lastTrick.winner : null;
+
+    return (
+      <div className="play-area">
+        {gameState.phase === GAME_PHASES.ROUND_END && (
+          <div className="round-end-overlay">
+            <button className="next-round-button" onClick={handleNewRound}>
+              Järgmine voor
+            </button>
+          </div>
+        )}
+        {positions.map(({ index, className, name }) => {
+          const card = getPlayerCard(index);
+          const isCurrentPlayer = gameState.currentPlayer === index;
+          const isWinner = showingLastTrick && index === trickWinner;
+
+          return (
+            <div key={index} className={`player-spot ${className} ${isCurrentPlayer ? 'active' : ''} ${isWinner ? 'winner' : ''}`}>
+              <div className="player-label">
+                {name}{getPlayerStatus(index)}
+              </div>
+              {card && (
+                <div className="player-card">
+                  <Card card={card} trumpSuit={gameState.trumpSuit} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const calculateCurrentTrickPoints = () => {
@@ -291,11 +314,6 @@ export default function GameBoard() {
     return (
       <div className="scores">
         <h3>Mänguseis (16-ni):</h3>
-        {gameState.trumpSuit && (
-          <div className="trump-indicator">
-            Trump: <span className="trump-suit">{SUIT_NAMES_ET[gameState.trumpSuit]}</span>
-          </div>
-        )}
         <div className="score-table">
           <div className="score-header">
             <div className="score-team">Meie</div>
@@ -334,15 +352,6 @@ export default function GameBoard() {
             </div>
           </div>
         )}
-
-        {gameState.phase === GAME_PHASES.ROUND_END && (
-          <div className="round-scores">
-            <h4>Voor lõppes:</h4>
-            <div>Meie: {gameState.roundScores[0]} tihipunkti</div>
-            <div>Teie: {gameState.roundScores[1]} tihipunkti</div>
-            <button onClick={handleNewRound}>Järgmine voor</button>
-          </div>
-        )}
       </div>
     );
   };
@@ -366,8 +375,6 @@ export default function GameBoard() {
 
   return (
     <div className="game-board">
-      <div className="message-bar">{message}</div>
-
       <div className="main-layout">
         {/* Left sidebar with scores */}
         <div className="sidebar-left">
@@ -377,7 +384,7 @@ export default function GameBoard() {
         {/* Main game area */}
         <div className="game-area">
           {renderGameEnd()}
-          {renderCurrentTrick()}
+          {renderPlayArea()}
           {renderBiddingControls()}
           {renderTrumpChoice()}
 

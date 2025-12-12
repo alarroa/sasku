@@ -30,6 +30,8 @@ export function makeAIBid(state, playerIndex) {
 // Choose trump suit
 export function chooseAITrump(state, playerIndex) {
   const hand = state.hands[playerIndex];
+  const myBid = state.bids[playerIndex];
+  const pictures = hand.filter(card => card.isPicture).length;
 
   // Count non-picture cards by suit
   const suitCounts = {};
@@ -37,10 +39,11 @@ export function chooseAITrump(state, playerIndex) {
     suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1;
   });
 
-  // Find the longest suit(s) - these are valid trump choices
-  const maxSuitCount = Math.max(0, ...Object.values(suitCounts));
+  // Find all suits that allow the bid
+  // Bid = pictures + suit_count, so suit_count = bid - pictures
+  const requiredSuitCount = myBid - pictures;
   const validSuits = Object.keys(suitCounts).filter(suit =>
-    suitCounts[suit] === maxSuitCount
+    suitCounts[suit] >= requiredSuitCount
   );
 
   // Diamonds can always be chosen

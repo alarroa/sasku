@@ -95,15 +95,7 @@ Ehitatud failid on `dist/` kaustas.
 - Trump kehtib kogu vooru
 - Pildid on alati trumbid (olenemata valitud mastist)
 
-#### 3. Pildi andmine (Picture Giving)
-
-**Reeglid:**
-- Kui trumpi tegijal on **täpselt 1 pilt** ja partneril **vähem kui 9 pilti**
-- Trumpi tegija saab anda oma pildi partnerile
-- Vastutasuks saab ta partnerilt ühe kaardi
-- See on valikuline
-
-#### 4. Mängimine
+#### 3. Mängimine
 
 **Tihide reeglid:**
 - Esimese tihi alustab mängija, kes on jagajast järgmine

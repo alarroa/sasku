@@ -2,7 +2,6 @@ import { createDeck, shuffleDeck, dealCards, SUITS, calculateBiddingValue } from
 
 export const GAME_PHASES = {
   BIDDING: 'bidding',
-  PICTURE_GIVING: 'picture_giving',
   PLAYING: 'playing',
   ROUND_END: 'round_end',
   GAME_END: 'game_end'
@@ -23,10 +22,6 @@ export function createInitialState() {
     hasPassed: [false, false, false, false],
     trumpSuit: null,
     trumpMaker: null,
-
-    // Picture giving state
-    pictureGivingOffer: null,
-    pictureGivingCard: null,
 
     // Playing state
     currentTrick: [],
@@ -105,21 +100,10 @@ export function chooseTrump(state, suit) {
   const newState = { ...state };
   newState.trumpSuit = suit;
 
-  // Check if picture giving is possible
-  const trumpMakerHand = newState.hands[newState.trumpMaker];
-  const pictures = trumpMakerHand.filter(card => card.isPicture);
-  const partnerIndex = getPartner(newState.trumpMaker);
-  const partnerPictures = newState.hands[partnerIndex].filter(card => card.isPicture);
-
-  // Can give picture if: has exactly 1 picture and partner doesn't have 9 pictures
-  if (pictures.length === 1 && partnerPictures.length < 9) {
-    newState.phase = GAME_PHASES.PICTURE_GIVING;
-    newState.currentPlayer = newState.trumpMaker;
-  } else {
-    newState.phase = GAME_PHASES.PLAYING;
-    newState.leadPlayer = getNextPlayer(newState.dealer);
-    newState.currentPlayer = newState.leadPlayer;
-  }
+  // Start playing phase
+  newState.phase = GAME_PHASES.PLAYING;
+  newState.leadPlayer = getNextPlayer(newState.dealer);
+  newState.currentPlayer = newState.leadPlayer;
 
   return newState;
 }
