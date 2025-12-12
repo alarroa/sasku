@@ -14,14 +14,36 @@ import {
   getNextPlayer
 } from '../game/gameState';
 import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
-import { SUITS, SUIT_NAMES_ET, calculateBiddingValue } from '../game/cards';
+import { SUITS, SUIT_NAMES_ET, SUIT_SYMBOLS, calculateBiddingValue } from '../game/cards';
 import { et } from '../i18n/et';
 import './GameBoard.css';
 
 const PLAYER_NAMES = [et.players.you, et.players.player2, et.players.partner, et.players.player4];
 
+const STORAGE_KEY = 'sasku-game-state';
+
 export default function GameBoard() {
-  const [gameState, setGameState] = useState(createInitialState());
+  const [gameState, setGameState] = useState(() => {
+    // Try to load saved game state from localStorage
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('Failed to load game state:', error);
+    }
+    return createInitialState();
+  });
+
+  // Save game state to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+    } catch (error) {
+      console.error('Failed to save game state:', error);
+    }
+  }, [gameState]);
 
   // AI turn handling
   useEffect(() => {
@@ -89,6 +111,16 @@ export default function GameBoard() {
 
   const handleNewRound = () => {
     setGameState(startNewRound(gameState));
+  };
+
+  const handleNewGame = () => {
+    // Clear localStorage and start fresh
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error('Failed to clear game state:', error);
+    }
+    setGameState(createInitialState());
   };
 
   const handleRuutuBid = () => {
@@ -207,12 +239,17 @@ export default function GameBoard() {
       }
     }
 
-    // Show trump suit name during playing for trump maker
-    if (gameState.phase === GAME_PHASES.PLAYING && gameState.trumpMaker === playerIndex && gameState.trumpSuit) {
-      parts.push(SUIT_NAMES_ET[gameState.trumpSuit]);
-    }
-
     return parts.length > 0 ? ` (${parts.join(' ')})` : '';
+  };
+
+  const getTrumpIcon = (playerIndex) => {
+    // Show trump icon for trump maker during playing
+    if (gameState.phase === GAME_PHASES.PLAYING &&
+        gameState.trumpMaker === playerIndex &&
+        gameState.trumpSuit) {
+      return SUIT_SYMBOLS[gameState.trumpSuit];
+    }
+    return null;
   };
 
   const getPlayerCard = (playerIndex) => {
@@ -313,11 +350,17 @@ export default function GameBoard() {
           const card = getPlayerCard(index);
           const isCurrentPlayer = gameState.currentPlayer === index;
           const isWinner = showingLastTrick && index === trickWinner;
+          const trumpIcon = getTrumpIcon(index);
 
           return (
             <div key={index} className={`player-spot ${className} ${isCurrentPlayer ? 'active' : ''} ${isWinner ? 'winner' : ''}`}>
               <div className="player-label">
                 {name}{getPlayerStatus(index)}
+                {trumpIcon && (
+                  <span className={`trump-icon trump-${gameState.trumpSuit}`}>
+                    {trumpIcon}
+                  </span>
+                )}
               </div>
               {card && (
                 <div className="player-card">
@@ -428,13 +471,18 @@ export default function GameBoard() {
         <p className="final-score">
           {et.scoring.ourTeam}: {gameState.gameScores[0]} - {et.scoring.theirTeam}: {gameState.gameScores[1]}
         </p>
-        <button onClick={() => setGameState(createInitialState())}>{et.gameEnd.newGame}</button>
+        <button onClick={handleNewGame}>{et.gameEnd.newGame}</button>
       </div>
     );
   };
 
   return (
     <div className="game-board">
+      {/* New Game button - always visible */}
+      <button className="new-game-button" onClick={handleNewGame}>
+        {et.gameEnd.newGame}
+      </button>
+
       {renderGameEnd()}
       {renderPlayArea()}
 
