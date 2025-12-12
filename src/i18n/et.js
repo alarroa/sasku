@@ -1,0 +1,48 @@
+// Estonian translations
+export const et = {
+  // Meta
+  meta: {
+    title: 'Sasku'
+  },
+
+  // Suit names
+  suits: {
+    clubs: 'Risti',
+    spades: 'Poti',
+    hearts: 'Ärtu',
+    diamonds: 'Ruutu'
+  },
+
+  // Player names
+  players: {
+    you: 'Sina',
+    player2: 'Mängija 2',
+    partner: 'Paariline',
+    player4: 'Mängija 4'
+  },
+
+  // Game phases
+  bidding: {
+    yourBid: 'Karju',
+    pass: 'Pass',
+    chooseTrump: 'Vali trump:',
+    ruutuButton: 'Ruutu ♦',
+  },
+
+  // Scoring
+  scoring: {
+    gameStatus: 'Mänguseis',
+    ourTeam: 'Meie',
+    theirTeam: 'Teie',
+    trickPoints: 'Punkte:',
+    trickPointsLabel: 'punkti',
+    nextRound: 'Järgmine voor'
+  },
+
+  // Game end
+  gameEnd: {
+    gameOver: 'Mäng läbi!',
+    winner: 'Võitja: {winner}',
+    newGame: 'Uus mäng'
+  }
+};

@@ -165,14 +165,35 @@ export function canPlayCard(state, playerIndex, card) {
     }
 
     // Don't have the suit - must play trump (picture or trump suit) if have any
-    const hasTrump = hand.some(c => c.isPicture || c.suit === trumpSuit);
-    if (hasTrump) {
-      // Must play trump (picture or trump suit)
-      return card.isPicture || card.suit === trumpSuit;
+    const trumpCards = hand.filter(c => c.isPicture || c.suit === trumpSuit);
+    if (trumpCards.length === 0) {
+      // No trump - can play anything
+      return true;
     }
 
-    // Don't have suit, trump, or pictures - can play anything
-    return true;
+    // Have trump - must play trump
+    const cardIsTrump = card.isPicture || card.suit === trumpSuit;
+    if (!cardIsTrump) return false;
+
+    // Find the current highest card in the trick
+    let highestCard = leadCard;
+    for (let i = 1; i < state.currentTrick.length; i++) {
+      const trickCard = state.currentTrick[i].card;
+      if (isCardStronger(trickCard, highestCard, leadCard, trumpSuit)) {
+        highestCard = trickCard;
+      }
+    }
+
+    // Check if we can beat the highest card
+    const canBeat = trumpCards.some(c => isCardStronger(c, highestCard, leadCard, trumpSuit));
+
+    if (canBeat) {
+      // Must beat if possible
+      return isCardStronger(card, highestCard, leadCard, trumpSuit);
+    } else {
+      // Can't beat - can play any trump
+      return cardIsTrump;
+    }
   }
 }
 

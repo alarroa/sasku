@@ -76,17 +76,28 @@ export function chooseAICard(state, playerIndex) {
   const team = playerIndex % 2;
 
   if (isLeading) {
-    // Leading: try to play a strong card or low card
-    // Prefer aces and tens for points
-    const strongCards = legalCards.filter(card =>
-      card.rank === RANKS.ACE || card.rank === RANKS.TEN || card.rank === RANKS.KING
+    // Leading: play either a suit ace or a low card (6, 7, 8, 9)
+    const aces = legalCards.filter(card =>
+      !card.isPicture && card.rank === RANKS.ACE
     );
 
-    if (strongCards.length > 0) {
-      return strongCards[0];
+    if (aces.length > 0) {
+      // Play an ace
+      return aces[0];
     }
 
-    // Otherwise play lowest card
+    // Find low cards (6, 7, 8, 9)
+    const lowCards = legalCards.filter(card =>
+      !card.isPicture &&
+      (card.rank === '6' || card.rank === '7' || card.rank === '8' || card.rank === '9')
+    );
+
+    if (lowCards.length > 0) {
+      // Play lowest card
+      return lowCards[lowCards.length - 1];
+    }
+
+    // If no aces or low cards, play the lowest card available
     return legalCards[legalCards.length - 1];
   } else {
     // Following: smart play based on who's winning

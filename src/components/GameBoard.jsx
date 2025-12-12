@@ -15,9 +15,10 @@ import {
 } from '../game/gameState';
 import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
 import { SUITS, SUIT_NAMES_ET, calculateBiddingValue } from '../game/cards';
+import { et } from '../i18n/et';
 import './GameBoard.css';
 
-const PLAYER_NAMES = ['Sina', 'Mängija 2', 'Partner', 'Mängija 4'];
+const PLAYER_NAMES = [et.players.you, et.players.player2, et.players.partner, et.players.player4];
 
 export default function GameBoard() {
   const [gameState, setGameState] = useState(createInitialState());
@@ -121,18 +122,18 @@ export default function GameBoard() {
 
     return (
       <div className="bidding-controls">
-        <h3>Sinu pakkumine:</h3>
+        <h3>{et.bidding.yourBid}</h3>
         <div className="bid-buttons">
           {possibleBids.slice(0, 10).map(bid => (
             <button key={bid} onClick={() => handleBid(bid)}>
               {bid}
             </button>
           ))}
-          <button className="ruutu-button" onClick={handleRuutuBid} title="Paku kohe ruudu trumpiga (4 punkti võites)">
-            Ruutu ♦
+          <button className="ruutu-button" onClick={handleRuutuBid}>
+            {et.bidding.ruutuButton}
           </button>
         </div>
-        <button className="pass-button" onClick={handlePass}>Pass</button>
+        <button className="pass-button" onClick={handlePass}>{et.bidding.pass}</button>
       </div>
     );
   };
@@ -167,7 +168,7 @@ export default function GameBoard() {
 
     return (
       <div className="trump-choice">
-        <h3>Vali trump:</h3>
+        <h3>{et.bidding.chooseTrump}</h3>
         <div className="trump-buttons">
           {Object.entries(SUIT_NAMES_ET)
             .filter(([suit]) => validSuits.includes(suit))
@@ -177,11 +178,6 @@ export default function GameBoard() {
               </button>
             ))}
         </div>
-        <p className="trump-hint">
-          Pakkumine: {myBid} ({pictures} pilti + vähemalt {requiredSuitCount} masti)
-          <br />
-          Võid valida: {validSuits.map(s => SUIT_NAMES_ET[s]).join(', ')}
-        </p>
       </div>
     );
   };
@@ -192,7 +188,7 @@ export default function GameBoard() {
     // Show bid or pass during bidding
     if (gameState.phase === GAME_PHASES.BIDDING) {
       if (gameState.hasPassed[playerIndex]) {
-        parts.push('Pass');
+        parts.push(et.bidding.pass);
       } else if (gameState.bids[playerIndex] !== null) {
         parts.push(`${gameState.bids[playerIndex]}`);
       }
@@ -245,7 +241,7 @@ export default function GameBoard() {
         {gameState.phase === GAME_PHASES.ROUND_END && (
           <div className="round-end-overlay">
             <button className="next-round-button" onClick={handleNewRound}>
-              Järgmine voor
+              {et.scoring.nextRound}
             </button>
           </div>
         )}
@@ -313,11 +309,11 @@ export default function GameBoard() {
 
     return (
       <div className="scores">
-        <h3>Mänguseis (16-ni):</h3>
+        <h3>{et.scoring.gameStatus}</h3>
         <div className="score-table">
           <div className="score-header">
-            <div className="score-team">Meie</div>
-            <div className="score-team">Teie</div>
+            <div className="score-team">{et.scoring.ourTeam}</div>
+            <div className="score-team">{et.scoring.theirTeam}</div>
           </div>
           <div className="score-marks">
             {Array.from({ length: maxRows }).map((_, index) => (
@@ -341,13 +337,13 @@ export default function GameBoard() {
 
         {showCurrentPoints && (
           <div className="current-trick-points">
-            <h4>Tihipunktid:</h4>
+            <h4>{et.scoring.trickPoints}</h4>
             <div className="trick-points-row">
-              <span>Meie:</span>
+              <span>{et.scoring.ourTeam}:</span>
               <span className="points-value">{currentPoints[0]}</span>
             </div>
             <div className="trick-points-row">
-              <span>Teie:</span>
+              <span>{et.scoring.theirTeam}:</span>
               <span className="points-value">{currentPoints[1]}</span>
             </div>
           </div>
@@ -359,16 +355,16 @@ export default function GameBoard() {
   const renderGameEnd = () => {
     if (gameState.phase !== GAME_PHASES.GAME_END) return null;
 
-    const winner = gameState.gameScores[0] >= 16 ? 'Meie' : 'Teie';
+    const winner = gameState.gameScores[0] >= 16 ? et.scoring.ourTeam : et.scoring.theirTeam;
 
     return (
       <div className="game-end">
-        <h2>Mäng läbi!</h2>
-        <p>Võitja: {winner}</p>
+        <h2>{et.gameEnd.gameOver}</h2>
+        <p>{et.gameEnd.winner.replace('{winner}', winner)}</p>
         <p className="final-score">
-          Meie: {gameState.gameScores[0]} - Teie: {gameState.gameScores[1]}
+          {et.scoring.ourTeam}: {gameState.gameScores[0]} - {et.scoring.theirTeam}: {gameState.gameScores[1]}
         </p>
-        <button onClick={() => setGameState(createInitialState())}>Uus mäng</button>
+        <button onClick={() => setGameState(createInitialState())}>{et.gameEnd.newGame}</button>
       </div>
     );
   };

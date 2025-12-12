@@ -1,4 +1,5 @@
 // Sasku card definitions and utilities
+import { et } from '../i18n/et.js';
 
 // Suits in strength order (strongest first)
 export const SUITS = {
@@ -16,10 +17,10 @@ export const SUIT_SYMBOLS = {
 };
 
 export const SUIT_NAMES_ET = {
-  [SUITS.CLUBS]: 'Risti',
-  [SUITS.SPADES]: 'Poti',
-  [SUITS.HEARTS]: 'Ärtu',
-  [SUITS.DIAMONDS]: 'Ruutu'
+  [SUITS.CLUBS]: et.suits.clubs,
+  [SUITS.SPADES]: et.suits.spades,
+  [SUITS.HEARTS]: et.suits.hearts,
+  [SUITS.DIAMONDS]: et.suits.diamonds
 };
 
 // Ranks (in strength order for pictures and regular cards)
