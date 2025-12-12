@@ -236,8 +236,41 @@ export default function GameBoard() {
                              gameState.phase === GAME_PHASES.ROUND_END;
     const trickWinner = showingLastTrick ? gameState.lastTrick.winner : null;
 
+    // Calculate trick points for display
+    const currentPoints = calculateCurrentTrickPoints();
+
     return (
       <div className="play-area">
+        {/* Top-left: Trick points */}
+        <div className="corner-info top-left">
+          <div className="corner-label">{et.scoring.trickPoints}</div>
+          <div className="corner-scores">
+            <div className="corner-score-row">
+              <span className="score-label">{et.scoring.ourTeam}:</span>
+              <span className="score-value">{currentPoints[0]}</span>
+            </div>
+            <div className="corner-score-row">
+              <span className="score-label">{et.scoring.theirTeam}:</span>
+              <span className="score-value">{currentPoints[1]}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Top-right: Game scores */}
+        <div className="corner-info top-right">
+          <div className="corner-label">{et.scoring.gameStatus}</div>
+          <div className="corner-scores">
+            <div className="corner-score-row">
+              <span className="score-label">{et.scoring.ourTeam}:</span>
+              <span className="score-value">{gameState.gameScores[0]}</span>
+            </div>
+            <div className="corner-score-row">
+              <span className="score-label">{et.scoring.theirTeam}:</span>
+              <span className="score-value">{gameState.gameScores[1]}</span>
+            </div>
+          </div>
+        </div>
+
         {gameState.phase === GAME_PHASES.ROUND_END && (
           <div className="round-end-overlay">
             <button className="next-round-button" onClick={handleNewRound}>
@@ -371,33 +404,23 @@ export default function GameBoard() {
 
   return (
     <div className="game-board">
-      <div className="main-layout">
-        {/* Left sidebar with scores */}
-        <div className="sidebar-left">
-          {renderScores()}
-        </div>
+      {renderGameEnd()}
+      {renderPlayArea()}
+      {renderBiddingControls()}
+      {renderTrumpChoice()}
 
-        {/* Main game area */}
-        <div className="game-area">
-          {renderGameEnd()}
-          {renderPlayArea()}
-          {renderBiddingControls()}
-          {renderTrumpChoice()}
-
-          {/* Player's hand */}
-          <div className="player-hand-container">
-            <Hand
-              cards={gameState.hands[0]}
-              onCardClick={handleCardPlay}
-              canPlay={gameState.phase === GAME_PHASES.PLAYING}
-              playerName={PLAYER_NAMES[0]}
-              isCurrentPlayer={gameState.currentPlayer === 0}
-              hidden={false}
-              trumpSuit={gameState.trumpSuit}
-              canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
-            />
-          </div>
-        </div>
+      {/* Player's hand */}
+      <div className="player-hand-container">
+        <Hand
+          cards={gameState.hands[0]}
+          onCardClick={handleCardPlay}
+          canPlay={gameState.phase === GAME_PHASES.PLAYING}
+          playerName={PLAYER_NAMES[0]}
+          isCurrentPlayer={gameState.currentPlayer === 0}
+          hidden={false}
+          trumpSuit={gameState.trumpSuit}
+          canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
+        />
       </div>
     </div>
   );
