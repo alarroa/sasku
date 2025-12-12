@@ -26,7 +26,7 @@ export const et = {
     yourBid: 'Karju',
     pass: 'Pass',
     chooseTrump: 'Vali trump:',
-    ruutuButton: 'Ruutu ♦',
+    ruutuButton: 'Ruutu',
   },
 
   // Scoring

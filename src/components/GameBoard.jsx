@@ -284,9 +284,9 @@ export default function GameBoard() {
           </div>
         </div>
 
-        {/* Center overlays */}
+        {/* Bottom overlays for bidding/trump */}
         {shouldShowBiddingControls() && (
-          <div className="center-overlay">
+          <div className="bottom-overlay">
             <div className="overlay-content">
               {renderBiddingControls()}
             </div>
@@ -294,13 +294,14 @@ export default function GameBoard() {
         )}
 
         {shouldShowTrumpChoice() && (
-          <div className="center-overlay">
+          <div className="bottom-overlay">
             <div className="overlay-content">
               {renderTrumpChoice()}
             </div>
           </div>
         )}
 
+        {/* Center overlay for round end */}
         {gameState.phase === GAME_PHASES.ROUND_END && (
           <div className="center-overlay">
             <button className="next-round-button" onClick={handleNewRound}>
@@ -443,7 +444,6 @@ export default function GameBoard() {
           cards={gameState.hands[0]}
           onCardClick={handleCardPlay}
           canPlay={gameState.phase === GAME_PHASES.PLAYING}
-          playerName={PLAYER_NAMES[0]}
           isCurrentPlayer={gameState.currentPlayer === 0}
           hidden={false}
           trumpSuit={gameState.trumpSuit}

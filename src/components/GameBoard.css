@@ -75,7 +75,7 @@
 }
 
 .bid-buttons button {
-  padding: 8px 12px;
+  padding: 10px 15px;
   background: #2196F3;
   color: white;
   border: none;
@@ -108,7 +108,7 @@
 }
 
 .pass-button {
-  padding: 10px 30px;
+  padding: 8px 20px;
   background: #f44336;
   color: white;
   border: none;
@@ -116,7 +116,6 @@
   cursor: pointer;
   font-size: 16px;
   font-weight: bold;
-  margin-top: 10px;
 }
 
 .pass-button:hover {
@@ -206,19 +205,27 @@
   text-align: right;
 }
 
-.center-overlay {
+.bottom-overlay {
   position: absolute;
-  top: 78%;
+  bottom: 5px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   z-index: 10;
   min-width: 300px;
   max-width: 90%;
 }
 
+.center-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+
 .overlay-content {
   background: rgba(0, 0, 0, 0.85);
-  padding: 20px 25px;
+  padding: 15px 15px;
   border-radius: 12px;
   text-align: center;
   backdrop-filter: blur(10px);
@@ -231,7 +238,7 @@
 }
 
 .next-round-button {
-  padding: 15px 40px;
+  padding: 15px 20px;
   background: #4CAF50;
   color: white;
   border: none;
@@ -394,12 +401,12 @@
   }
 
   .overlay-content {
-    padding: 15px 20px;
+    padding: 8px 20px;
   }
 
   .bid-buttons button,
   .trump-buttons button {
-    padding: 8px 8px;
+    padding: 10px 12px;
     font-size: 14px;
   }
 

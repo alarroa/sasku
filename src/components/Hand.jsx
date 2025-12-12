@@ -2,12 +2,11 @@ import Card from './Card';
 import { sortHand } from '../game/cards';
 import './Hand.css';
 
-export default function Hand({ cards, onCardClick, canPlay, playerName, isCurrentPlayer, hidden, trumpSuit, canPlayCardFn }) {
+export default function Hand({ cards, onCardClick, canPlay, isCurrentPlayer, hidden, trumpSuit, canPlayCardFn }) {
   const sortedCards = sortHand(cards, trumpSuit);
 
   return (
     <div className={`hand ${isCurrentPlayer ? 'current-player' : ''} ${hidden ? 'hidden-hand' : ''}`}>
-      {playerName && <div className="player-name">{playerName}</div>}
       <div className="cards">
         {hidden ? (
           // Show card backs for hidden hands
