@@ -66,30 +66,16 @@
   50% { transform: translateY(-10px); }
 }
 
-.bidding-controls {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 20px;
-  border-radius: 8px;
-  margin: 20px auto;
-  max-width: 600px;
-  text-align: center;
-  backdrop-filter: blur(10px);
-}
-
-.bidding-controls h3 {
-  margin-top: 0;
-}
-
 .bid-buttons {
   display: flex;
-  gap: 10px;
+  gap: 5px;
   justify-content: center;
   flex-wrap: wrap;
   margin-bottom: 15px;
 }
 
 .bid-buttons button {
-  padding: 10px 20px;
+  padding: 8px 12px;
   background: #2196F3;
   color: white;
   border: none;
@@ -97,7 +83,7 @@
   cursor: pointer;
   font-size: 16px;
   font-weight: bold;
-  min-width: 50px;
+  min-width: 20px;
 }
 
 .bid-buttons button:hover {
@@ -113,8 +99,6 @@
   cursor: pointer;
   font-size: 16px;
   font-weight: bold;
-  min-width: 80px;
-  margin-left: 10px;
   border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -139,23 +123,9 @@
   background: #d32f2f;
 }
 
-.trump-choice {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 20px;
-  border-radius: 8px;
-  margin: 20px auto;
-  max-width: 600px;
-  text-align: center;
-  backdrop-filter: blur(10px);
-}
-
-.trump-choice h3 {
-  margin-top: 0;
-}
-
 .trump-buttons {
   display: flex;
-  gap: 15px;
+  gap: 7px;
   justify-content: center;
   flex-wrap: wrap;
 }
@@ -173,13 +143,6 @@
 
 .trump-buttons button:hover {
   background: #7B1FA2;
-}
-
-.trump-hint {
-  margin-top: 10px;
-  font-size: 14px;
-  opacity: 0.9;
-  color: #fff;
 }
 
 .play-area {
@@ -243,12 +206,28 @@
   text-align: right;
 }
 
-.round-end-overlay {
+.center-overlay {
   position: absolute;
-  top: 50%;
+  top: 78%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 10;
+  min-width: 300px;
+  max-width: 90%;
+}
+
+.overlay-content {
+  background: rgba(0, 0, 0, 0.85);
+  padding: 20px 25px;
+  border-radius: 12px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.overlay-content h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
 }
 
 .next-round-button {
@@ -414,16 +393,13 @@
     margin: 20px auto;
   }
 
-  .bidding-controls,
-  .trump-choice,
-  .current-trick {
-    padding: 15px;
-    margin: 15px 10px;
+  .overlay-content {
+    padding: 15px 20px;
   }
 
   .bid-buttons button,
   .trump-buttons button {
-    padding: 10px 15px;
+    padding: 8px 8px;
     font-size: 14px;
   }
 

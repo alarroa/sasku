@@ -93,8 +93,9 @@ export default function GameBoard() {
 
   const handleRuutuBid = () => {
     // Automatically bid and choose diamonds as trump
+    // Minimum bid is 4
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
-    const newBid = currentHighBid + 1;
+    const newBid = Math.max(4, currentHighBid + 1);
 
     const newState = { ...gameState };
     newState.bids = [...gameState.bids];
@@ -107,21 +108,29 @@ export default function GameBoard() {
     setGameState(newState);
   };
 
+  const shouldShowBiddingControls = () => {
+    return gameState.phase === GAME_PHASES.BIDDING &&
+           gameState.currentPlayer === 0 &&
+           !gameState.hasPassed[0] &&
+           gameState.trumpMaker === null;
+  };
+
   const renderBiddingControls = () => {
-    if (gameState.phase !== GAME_PHASES.BIDDING) return null;
-    if (gameState.currentPlayer !== 0 || gameState.hasPassed[0]) return null;
-    if (gameState.trumpMaker !== null) return null; // Trump maker chosen, don't show bidding
+    if (!shouldShowBiddingControls()) return null;
 
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
     const maxPossibleBid = calculateBiddingValue(gameState.hands[0]);
     const possibleBids = [];
 
-    for (let i = currentHighBid + 1; i <= maxPossibleBid; i++) {
+    // Minimum bid is 4
+    const minBid = Math.max(4, currentHighBid + 1);
+
+    for (let i = minBid; i <= maxPossibleBid; i++) {
       possibleBids.push(i);
     }
 
     return (
-      <div className="bidding-controls">
+      <>
         <h3>{et.bidding.yourBid}</h3>
         <div className="bid-buttons">
           {possibleBids.slice(0, 10).map(bid => (
@@ -134,14 +143,18 @@ export default function GameBoard() {
           </button>
         </div>
         <button className="pass-button" onClick={handlePass}>{et.bidding.pass}</button>
-      </div>
+      </>
     );
   };
 
+  const shouldShowTrumpChoice = () => {
+    return !gameState.trumpSuit &&
+           gameState.trumpMaker === 0 &&
+           gameState.trumpMaker !== null;
+  };
+
   const renderTrumpChoice = () => {
-    if (gameState.trumpSuit) return null; // Trump already chosen
-    if (gameState.trumpMaker !== 0) return null; // Not our turn to choose
-    if (gameState.trumpMaker === null) return null; // No trump maker yet
+    if (!shouldShowTrumpChoice()) return null;
 
     // Calculate valid trump suits based on the bid and hand
     const hand = gameState.hands[0];
@@ -167,7 +180,7 @@ export default function GameBoard() {
     }
 
     return (
-      <div className="trump-choice">
+      <>
         <h3>{et.bidding.chooseTrump}</h3>
         <div className="trump-buttons">
           {Object.entries(SUIT_NAMES_ET)
@@ -178,7 +191,7 @@ export default function GameBoard() {
               </button>
             ))}
         </div>
-      </div>
+      </>
     );
   };
 
@@ -271,8 +284,25 @@ export default function GameBoard() {
           </div>
         </div>
 
+        {/* Center overlays */}
+        {shouldShowBiddingControls() && (
+          <div className="center-overlay">
+            <div className="overlay-content">
+              {renderBiddingControls()}
+            </div>
+          </div>
+        )}
+
+        {shouldShowTrumpChoice() && (
+          <div className="center-overlay">
+            <div className="overlay-content">
+              {renderTrumpChoice()}
+            </div>
+          </div>
+        )}
+
         {gameState.phase === GAME_PHASES.ROUND_END && (
-          <div className="round-end-overlay">
+          <div className="center-overlay">
             <button className="next-round-button" onClick={handleNewRound}>
               {et.scoring.nextRound}
             </button>
@@ -406,8 +436,6 @@ export default function GameBoard() {
     <div className="game-board">
       {renderGameEnd()}
       {renderPlayArea()}
-      {renderBiddingControls()}
-      {renderTrumpChoice()}
 
       {/* Player's hand */}
       <div className="player-hand-container">

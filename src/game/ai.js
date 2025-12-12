@@ -9,14 +9,17 @@ export function makeAIBid(state, playerIndex) {
   // Get current high bid
   const currentHighBid = Math.max(0, ...state.bids.filter(b => b !== null));
 
+  // Minimum bid is 4
+  const minBid = Math.max(4, currentHighBid + 1);
+
   // Can't bid higher than max possible
-  if (currentHighBid >= maxPossibleBid) {
+  if (minBid > maxPossibleBid) {
     return null; // Pass
   }
 
   // Bid if value is good enough and can outbid current
-  if (maxPossibleBid >= 7 && canMakeBid(state, playerIndex, currentHighBid + 1)) {
-    return currentHighBid + 1;
+  if (maxPossibleBid >= 7 && canMakeBid(state, playerIndex, minBid)) {
+    return minBid;
   }
 
   // Consider bidding with slightly lower value if no one has bid yet
