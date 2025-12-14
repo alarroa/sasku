@@ -4,11 +4,14 @@ import Card from './Card';
 import {
   createInitialState,
   GAME_PHASES,
+  DEAL_OPTIONS,
   canPlayCard,
   playCard,
   makeBid,
   passBid,
   chooseTrump,
+  chooseDealOption,
+  chooseCardPack,
   startNewRound,
   getTeam,
   getNextPlayer
@@ -72,7 +75,10 @@ export default function GameBoard() {
     const timer = setTimeout(() => {
       const playerIndex = gameState.currentPlayer;
 
-      if (gameState.phase === GAME_PHASES.BIDDING) {
+      if (gameState.phase === GAME_PHASES.DEAL_CHOICE) {
+        // AI always chooses "Tõstan" (normal deal)
+        setGameState(chooseDealOption(gameState, DEAL_OPTIONS.TOSTAN));
+      } else if (gameState.phase === GAME_PHASES.BIDDING) {
         // Check if this player needs to choose trump
         if (gameState.trumpMaker === playerIndex && !gameState.trumpSuit) {
           const trump = chooseAITrump(gameState, playerIndex);
@@ -97,6 +103,14 @@ export default function GameBoard() {
 
     return () => clearTimeout(timer);
   }, [gameState]);
+
+  const handleDealChoice = (option) => {
+    setGameState(chooseDealOption(gameState, option));
+  };
+
+  const handlePackChoice = (packIndex) => {
+    setGameState(chooseCardPack(gameState, 0, packIndex));
+  };
 
   const handleBid = (bid) => {
     const newState = makeBid(gameState, 0, bid);
@@ -148,6 +162,58 @@ export default function GameBoard() {
            gameState.currentPlayer === 0 &&
            !gameState.hasPassed[0] &&
            gameState.trumpMaker === null;
+  };
+
+  const renderDealChoice = () => {
+    if (gameState.phase !== GAME_PHASES.DEAL_CHOICE || gameState.currentPlayer !== 0) {
+      return null;
+    }
+
+    return (
+      <div className="center-overlay">
+        <div className="overlay-content">
+          <h3>{et.dealChoice.title}</h3>
+          <div className="deal-choice-buttons">
+            <button className="deal-choice-button" onClick={() => handleDealChoice(DEAL_OPTIONS.TOSTAN)}>
+              <div className="deal-choice-title">{et.dealChoice.tostan}</div>
+              <div className="deal-choice-desc">{et.dealChoice.tostanDesc}</div>
+            </button>
+            <button className="deal-choice-button" onClick={() => handleDealChoice(DEAL_OPTIONS.PIME_RUUTU)}>
+              <div className="deal-choice-title">{et.dealChoice.pimeRuutu}</div>
+              <div className="deal-choice-desc">{et.dealChoice.pimeRuutuDesc}</div>
+            </button>
+            <button className="deal-choice-button" onClick={() => handleDealChoice(DEAL_OPTIONS.VALIDA)}>
+              <div className="deal-choice-title">{et.dealChoice.valida}</div>
+              <div className="deal-choice-desc">{et.dealChoice.validaDesc}</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPackChoice = () => {
+    if (gameState.phase !== GAME_PHASES.PACK_CHOICE || gameState.currentPlayer !== 0) {
+      return null;
+    }
+
+    return (
+      <div className="center-overlay">
+        <div className="overlay-content">
+          <h3>{et.dealChoice.choosePack}</h3>
+          <div className="pack-choice-grid">
+            {gameState.cardPacks.map((pack, index) => (
+              <div key={index} className="pack-choice" onClick={() => handlePackChoice(index)}>
+                <div className="pack-cards">
+                  <Card card={pack.topCard} disabled={false} />
+                  <Card card={pack.bottomCard} disabled={false} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderBiddingControls = () => {
@@ -481,6 +547,8 @@ export default function GameBoard() {
   return (
     <div className="game-board">
       {renderGameEnd()}
+      {renderDealChoice()}
+      {renderPackChoice()}
       {renderPlayArea()}
 
       {/* Player's hand */}

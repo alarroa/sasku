@@ -26,6 +26,14 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
+
+html {
+  overflow-x: hidden;
+  width: 100%;
 }
 
 h1 {

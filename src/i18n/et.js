@@ -21,6 +21,18 @@ export const et = {
     player4: 'Mängija 4'
   },
 
+  // Deal choice
+  dealChoice: {
+    title: 'Kuidas jagada kaarte?',
+    tostan: 'Tõstan',
+    tostanDesc: 'Tavaline jagamine',
+    pimeRuutu: 'Pime',
+    pimeRuutuDesc: 'Ruutu trumbiks ilma kaarte nägemata (+2 punkti boonust)',
+    valida: 'Anna valida',
+    validaDesc: 'Vali endale kaardipakk',
+    choosePack: 'Vali kaardipakk:'
+  },
+
   // Game phases
   bidding: {
     yourBid: 'Karju',

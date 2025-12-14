@@ -1,21 +1,31 @@
 import { createDeck, shuffleDeck, dealCards, SUITS, calculateBiddingValue } from './cards.js';
 
 export const GAME_PHASES = {
+  DEAL_CHOICE: 'deal_choice',
+  PACK_CHOICE: 'pack_choice',
   BIDDING: 'bidding',
   PLAYING: 'playing',
   ROUND_END: 'round_end',
   GAME_END: 'game_end'
 };
 
-export function createInitialState() {
-  const deck = shuffleDeck(createDeck());
-  const hands = dealCards(deck);
+export const DEAL_OPTIONS = {
+  TOSTAN: 'tostan',
+  PIME_RUUTU: 'pime_ruutu',
+  VALIDA: 'valida'
+};
 
+export function createInitialState() {
   return {
-    phase: GAME_PHASES.BIDDING,
-    hands: hands,
-    currentPlayer: 0,
-    dealer: 0,
+    phase: GAME_PHASES.DEAL_CHOICE,
+    hands: [[], [], [], []],
+    currentPlayer: 0, // Player after dealer (dealer is 3)
+    dealer: 3,
+
+    // Deal choice state
+    dealOption: null,
+    pimeRuutuBonus: false,
+    cardPacks: null, // For "valida" option
 
     // Bidding state
     bids: [null, null, null, null],
@@ -47,6 +57,82 @@ export function getPartner(playerIndex) {
 
 export function getNextPlayer(currentPlayer) {
   return (currentPlayer + 1) % 4;
+}
+
+// Deal choice functions
+export function chooseDealOption(state, option) {
+  const newState = { ...state };
+  newState.dealOption = option;
+
+  if (option === DEAL_OPTIONS.TOSTAN) {
+    // Normal deal - shuffle and deal cards
+    const deck = shuffleDeck(createDeck());
+    newState.hands = dealCards(deck);
+    newState.phase = GAME_PHASES.BIDDING;
+    newState.currentPlayer = getNextPlayer(state.dealer);
+  } else if (option === DEAL_OPTIONS.PIME_RUUTU) {
+    // Blind diamonds - deal cards but set trump to diamonds immediately
+    const deck = shuffleDeck(createDeck());
+    newState.hands = dealCards(deck);
+    newState.trumpSuit = SUITS.DIAMONDS;
+    newState.trumpMaker = state.currentPlayer;
+    newState.pimeRuutuBonus = true;
+    newState.phase = GAME_PHASES.PLAYING;
+    newState.leadPlayer = getNextPlayer(state.dealer);
+    newState.currentPlayer = newState.leadPlayer;
+  } else if (option === DEAL_OPTIONS.VALIDA) {
+    // Create 4 packs of 9 cards each
+    const deck = shuffleDeck(createDeck());
+    const packs = [];
+    for (let i = 0; i < 4; i++) {
+      const pack = deck.slice(i * 9, (i + 1) * 9);
+      packs.push({
+        cards: pack,
+        topCard: pack[0],
+        bottomCard: pack[8]
+      });
+    }
+    newState.cardPacks = packs;
+    newState.phase = GAME_PHASES.PACK_CHOICE;
+  }
+
+  return newState;
+}
+
+export function chooseCardPack(state, playerIndex, packIndex) {
+  const newState = { ...state };
+
+  // Give chosen pack to current player
+  newState.hands = [...state.hands];
+  newState.hands[playerIndex] = state.cardPacks[packIndex].cards;
+
+  // Remove chosen pack from available packs
+  const remainingPacks = state.cardPacks.filter((_, i) => i !== packIndex);
+
+  // Distribute remaining packs to other players in order
+  // Starting from next player after the chooser
+  const chooserPosition = (playerIndex - getNextPlayer(state.dealer) + 4) % 4;
+  const playerOrder = [];
+
+  for (let i = 0; i < 4; i++) {
+    if (i !== chooserPosition) {
+      const actualPlayer = (getNextPlayer(state.dealer) + i) % 4;
+      playerOrder.push(actualPlayer);
+    }
+  }
+
+  playerOrder.forEach((player, index) => {
+    if (index < remainingPacks.length) {
+      newState.hands[player] = remainingPacks[index].cards;
+    }
+  });
+
+  // Move to bidding phase
+  newState.phase = GAME_PHASES.BIDDING;
+  newState.currentPlayer = getNextPlayer(state.dealer);
+  newState.cardPacks = null;
+
+  return newState;
 }
 
 export function canMakeBid(state, playerIndex, bid) {
@@ -371,20 +457,26 @@ function calculateRoundScore(state) {
 
     if (trumpMakerTricks === 9) {
       // Trump maker got all tricks (karvane)
-      state.gameScores[trumpMakerTeam] += 6;
+      let points = 6;
+      if (state.pimeRuutuBonus) points += 2; // Pime ruutu bonus
+      state.gameScores[trumpMakerTeam] += points;
     } else if (trumpMakerTricks === 0) {
       // Defenders got all tricks (karvane)
-      state.gameScores[1 - trumpMakerTeam] += 6;
+      let points = 6;
+      if (state.pimeRuutuBonus) points += 2; // Pime ruutu bonus goes to defenders
+      state.gameScores[1 - trumpMakerTeam] += points;
     } else if (trumpMakerPoints >= 61) {
       // Trump maker won
       let points = state.trumpSuit === SUITS.DIAMONDS ? 4 : 2;
       if (defenderPoints < 30) points += 2; // Jänn
+      if (state.pimeRuutuBonus) points += 2; // Pime ruutu bonus
       state.gameScores[trumpMakerTeam] += points;
     } else {
       // Trump was beaten
       let points = state.trumpSuit === SUITS.DIAMONDS ? 4 : 2;
       points += 2; // Bonus for beating opponent's trump
       if (trumpMakerPoints < 30) points += 2; // Jänn
+      if (state.pimeRuutuBonus) points += 2; // Pime ruutu bonus goes to defenders
       state.gameScores[1 - trumpMakerTeam] += points;
     }
   }
@@ -396,15 +488,13 @@ function calculateRoundScore(state) {
 }
 
 export function startNewRound(state) {
-  const deck = shuffleDeck(createDeck());
-  const hands = dealCards(deck);
   const newDealer = getNextPlayer(state.dealer);
 
   return {
     ...createInitialState(),
-    hands,
     dealer: newDealer,
     currentPlayer: getNextPlayer(newDealer),
-    gameScores: state.gameScores
+    gameScores: state.gameScores,
+    phase: GAME_PHASES.DEAL_CHOICE
   };
 }
