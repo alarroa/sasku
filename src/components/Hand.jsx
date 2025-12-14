@@ -20,12 +20,15 @@ export default function Hand({ cards, onCardClick, canPlay, isCurrentPlayer, hid
             // Check if this specific card can be played
             const cardCanBePlayed = canPlay && isCurrentPlayer && canPlayCardFn && canPlayCardFn(card);
 
+            // During bidding, cards are not disabled (just for viewing)
+            const isDisabled = isBidding ? false : !cardCanBePlayed;
+
             return (
               <Card
                 key={card.id}
                 card={card}
                 onClick={onCardClick}
-                disabled={!cardCanBePlayed}
+                disabled={isDisabled}
                 active={isBidding}
                 trumpSuit={trumpSuit}
               />
