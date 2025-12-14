@@ -9,8 +9,8 @@ export function makeAIBid(state, playerIndex) {
   // Get current high bid
   const currentHighBid = Math.max(0, ...state.bids.filter(b => b !== null));
 
-  // Minimum bid is 4
-  const minBid = Math.max(4, currentHighBid + 1);
+  // Minimum bid is 5
+  const minBid = Math.max(5, currentHighBid + 1);
 
   // Can't bid higher than max possible
   if (minBid > maxPossibleBid) {

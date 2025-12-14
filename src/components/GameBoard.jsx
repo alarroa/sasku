@@ -113,7 +113,13 @@ export default function GameBoard() {
   };
 
   const handleBid = (bid) => {
-    const newState = makeBid(gameState, 0, bid);
+    const newState = makeBid(gameState, 0, bid, false);
+    setGameState(newState);
+  };
+
+  const handleOmale = () => {
+    const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
+    const newState = makeBid(gameState, 0, currentHighBid, true);
     setGameState(newState);
   };
 
@@ -142,9 +148,9 @@ export default function GameBoard() {
 
   const handleRuutuBid = () => {
     // Automatically bid and choose diamonds as trump
-    // Minimum bid is 4
+    // Minimum bid is 5
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
-    const newBid = Math.max(4, currentHighBid + 1);
+    const newBid = Math.max(5, currentHighBid + 1);
 
     const newState = { ...gameState };
     newState.bids = [...gameState.bids];
@@ -223,8 +229,26 @@ export default function GameBoard() {
     const maxPossibleBid = calculateBiddingValue(gameState.hands[0]);
     const possibleBids = [];
 
-    // Minimum bid is 4
-    const minBid = Math.max(4, currentHighBid + 1);
+    // Minimum bid is 5
+    const minBid = Math.max(5, currentHighBid + 1);
+
+    // Check if "Omale" is available
+    // Player can say "Omale" if they made a bid before the current high bidder
+    let canOmale = false;
+    if (currentHighBid > 0 && currentHighBid <= maxPossibleBid) {
+      const bidsWithPlayers = gameState.bids.map((b, i) => ({ bid: b, player: i }))
+        .filter(b => b.bid !== null);
+
+      if (bidsWithPlayers.length >= 2) {
+        // Check if player 0 made a bid before the current high bid
+        for (let i = bidsWithPlayers.length - 1; i >= 0; i--) {
+          if (bidsWithPlayers[i].bid < currentHighBid && bidsWithPlayers[i].player === 0) {
+            canOmale = true;
+            break;
+          }
+        }
+      }
+    }
 
     for (let i = minBid; i <= maxPossibleBid; i++) {
       possibleBids.push(i);
@@ -234,6 +258,11 @@ export default function GameBoard() {
       <>
         <h3>{et.bidding.yourBid}</h3>
         <div className="bid-buttons">
+          {canOmale && (
+            <button className="omale-button" onClick={() => handleOmale()}>
+              {et.bidding.omale} ({currentHighBid})
+            </button>
+          )}
           {possibleBids.slice(0, 10).map(bid => (
             <button key={bid} onClick={() => handleBid(bid)}>
               {bid}

@@ -37,6 +37,7 @@ export const et = {
   bidding: {
     yourBid: 'Karju',
     pass: 'Pass',
+    omale: 'Omale',
     chooseTrump: 'Vali trump:',
     ruutuButton: 'Ruutu',
   },

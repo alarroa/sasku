@@ -30,6 +30,7 @@ export function createInitialState() {
     // Bidding state
     bids: [null, null, null, null],
     hasPassed: [false, false, false, false],
+    lastBidder: null,
     trumpSuit: null,
     trumpMaker: null,
 
@@ -141,14 +142,51 @@ export function canMakeBid(state, playerIndex, bid) {
   const currentHighBid = Math.max(0, ...state.bids.filter(b => b !== null));
   const maxPossibleBid = calculateBiddingValue(state.hands[playerIndex]);
 
-  return bid > currentHighBid && bid <= maxPossibleBid;
+  // Can't bid higher than max possible
+  if (bid > maxPossibleBid) return false;
+
+  // Check if this is "Omale" - player before the last bidder can match current high bid
+  // Find who made the bid before the current high bidder
+  if (state.lastBidder !== null && bid === currentHighBid) {
+    // Find the second highest bid to determine previous bidder
+    const bidsWithPlayers = state.bids.map((b, i) => ({ bid: b, player: i }))
+      .filter(b => b.bid !== null);
+
+    if (bidsWithPlayers.length >= 2) {
+      // Sort by bid value descending
+      bidsWithPlayers.sort((a, b) => b.bid - a.bid);
+
+      // If there are multiple bids at the highest value, find the one before current lastBidder
+      const highestBids = bidsWithPlayers.filter(b => b.bid === currentHighBid);
+
+      if (highestBids.length >= 1) {
+        // Find the bidder who bid just before the last bidder
+        for (let i = bidsWithPlayers.length - 1; i >= 0; i--) {
+          if (bidsWithPlayers[i].bid < currentHighBid && bidsWithPlayers[i].player === playerIndex) {
+            // This player made a bid before current high bid - can say "Omale"
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  // Normal bid - must be higher than current
+  return bid > currentHighBid;
 }
 
-export function makeBid(state, playerIndex, bid) {
+export function makeBid(state, playerIndex, bid, isOmale = false) {
   const newState = { ...state };
   newState.bids = [...state.bids];
   newState.bids[playerIndex] = bid;
+  newState.lastBidder = playerIndex;
   newState.currentPlayer = getNextPlayer(playerIndex);
+
+  // If "Omale", reset passes to allow another round
+  if (isOmale) {
+    newState.hasPassed = [false, false, false, false];
+  }
+
   return newState;
 }
 

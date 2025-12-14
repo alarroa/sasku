@@ -112,6 +112,22 @@
     transform: scale(1.05);
 }
 
+.omale-button {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.omale-button:hover {
+    background: linear-gradient(135deg, #F57C00 0%, #E65100 100%);
+    transform: scale(1.05);
+}
+
 .pass-button {
     padding: 8px 20px;
     background: #f44336;
