@@ -5,6 +5,7 @@
     padding: 20px;
     color: white;
     position: relative;
+    box-sizing: border-box;
 }
 
 .current-trick {
@@ -77,6 +78,8 @@
     justify-content: center;
     flex-wrap: wrap;
     margin-bottom: 15px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .bid-buttons button {
@@ -167,12 +170,14 @@
 
 .play-area {
     position: relative;
-    width: 600px;
+    width: 90%;
+    max-width: 600px;
     height: 500px;
     margin: 30px auto;
     background: rgba(0, 0, 0, 0.1);
     border-radius: 12px;
     border: 2px solid rgba(255, 255, 255, 0.2);
+    box-sizing: border-box;
 }
 
 .corner-info {
@@ -183,6 +188,7 @@
     font-size: 16px;
     backdrop-filter: blur(10px);
     z-index: 5;
+    box-sizing: border-box;
 }
 
 .corner-info.top-left {
@@ -237,8 +243,8 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
-    min-width: 300px;
-    max-width: 90%;
+    width: 90%;
+    max-width: 400px;
 }
 
 .center-overlay {
@@ -247,15 +253,19 @@
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 10;
+    width: 90%;
+    max-width: 500px;
 }
 
 .overlay-content {
     background: rgba(0, 0, 0, 0.85);
-    padding: 15px 15px;
+    padding: 15px;
     border-radius: 12px;
     text-align: center;
     backdrop-filter: blur(10px);
     border: 2px solid rgba(255, 255, 255, 0.2);
+    box-sizing: border-box;
+    width: 100%;
 }
 
 .overlay-content h3 {
@@ -286,6 +296,8 @@
     flex-direction: column;
     gap: 12px;
     margin-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .deal-choice-button {
@@ -321,6 +333,8 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 15px;
     margin-top: 15px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .pack-choice {
@@ -485,28 +499,41 @@
 /* Mobile responsive */
 @media (max-width: 768px) {
     .game-board {
-        padding: 10px;
+        padding: 5px;
     }
 
     .corner-info {
-        font-size: 13px;
-        padding: 6px 8px;
+        font-size: 11px;
+        padding: 4px 5px;
+        max-width: 42%;
+    }
+
+    .corner-info.top-left {
+        left: 5px;
+    }
+
+    .corner-info.top-right {
+        right: 5px;
     }
 
     .corner-label {
-        font-size: 11px;
+        font-size: 9px;
     }
 
     .score-label {
-        font-size: 14px;
+        font-size: 11px;
     }
 
     .score-value {
-        font-size: 14px;
+        font-size: 12px;
+    }
+
+    .corner-score-row {
+        gap: 6px;
     }
 
     .play-area {
-        width: 100%;
+        width: calc(100% - 10px);
         max-width: 400px;
         height: 400px;
         margin: 20px auto;
