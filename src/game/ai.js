@@ -1,36 +1,139 @@
 import { calculateBiddingValue, SUITS, RANKS } from './cards.js';
 import { canPlayCard, canMakeBid } from './gameState.js';
 
-// Simple AI for bidding
+// ============================================================================
+// CARD COUNTING AND TRACKING
+// ============================================================================
+
+function getPlayedCards(state) {
+  const played = [];
+
+  // Add cards from completed tricks
+  state.tricksWon.forEach(playerTricks => {
+    playerTricks.forEach(trick => {
+      trick.forEach(play => played.push(play.card));
+    });
+  });
+
+  // Add cards from current trick
+  state.currentTrick.forEach(play => played.push(play.card));
+
+  return played;
+}
+
+function countSuitPlayed(playedCards, suit) {
+  return playedCards.filter(c => !c.isPicture && c.suit === suit).length;
+}
+
+// ============================================================================
+// HAND EVALUATION UTILITIES
+// ============================================================================
+
+function evaluateHandStrength(hand) {
+  let strength = 0;
+
+  // Count high value cards
+  const aces = hand.filter(c => !c.isPicture && c.rank === RANKS.ACE).length;
+  const tens = hand.filter(c => !c.isPicture && c.rank === '10').length;
+  const kings = hand.filter(c => c.rank === 'K').length;
+  const queens = hand.filter(c => c.rank === 'Q').length;
+
+  strength += aces * 3;      // Aces are very valuable
+  strength += tens * 2.5;    // 10s are valuable
+  strength += kings * 2;     // Kings are good
+  strength += queens * 1.5;  // Queens are decent
+
+  return strength;
+}
+
+function getSuitDistribution(hand) {
+  const distribution = {};
+  hand.forEach(card => {
+    if (!card.isPicture) {
+      distribution[card.suit] = (distribution[card.suit] || 0) + 1;
+    }
+  });
+  return distribution;
+}
+
+function hasConcentratedSuits(hand) {
+  const dist = getSuitDistribution(hand);
+  const counts = Object.values(dist);
+  // Good if at least one suit has 4+ cards, or two suits have 3+ cards
+  return counts.some(c => c >= 4) || counts.filter(c => c >= 3).length >= 2;
+}
+
+function hasFourSuits(hand) {
+  const dist = getSuitDistribution(hand);
+  return Object.keys(dist).length === 4;
+}
+
+// ============================================================================
+// IMPROVED BIDDING LOGIC
+// ============================================================================
+
 export function makeAIBid(state, playerIndex) {
   const hand = state.hands[playerIndex];
   const maxPossibleBid = calculateBiddingValue(hand);
-
-  // Get current high bid
   const currentHighBid = Math.max(0, ...state.bids.filter(b => b !== null));
-
-  // Minimum bid is 5
   const minBid = Math.max(5, currentHighBid + 1);
 
-  // Can't bid higher than max possible
   if (minBid > maxPossibleBid) {
     return null; // Pass
   }
 
-  // Bid if value is good enough and can outbid current
-  if (maxPossibleBid >= 7 && canMakeBid(state, playerIndex, minBid)) {
-    return minBid;
+  const handStrength = evaluateHandStrength(hand);
+  const isDealer = playerIndex === state.dealer;
+  const partnerIndex = (playerIndex + 2) % 4;
+  const partnerBid = state.bids[partnerIndex];
+
+  // Don't bid if hand is too weak
+  if (hasFourSuits(hand) && handStrength < 8 && maxPossibleBid < 10) {
+    return null; // Pass - spread hand with no strength
   }
 
-  // Consider bidding with slightly lower value if no one has bid yet
-  if (currentHighBid === 0 && maxPossibleBid >= 5) {
-    return Math.min(maxPossibleBid, 10);
+  // If partner has already bid, be VERY conservative
+  // Only outbid partner if we have significantly stronger hand
+  if (partnerBid !== null && partnerBid > 0) {
+    // Partner is bidding - only compete if our hand is much stronger
+    if (handStrength < 12 || maxPossibleBid < partnerBid + 3) {
+      return null; // Pass - let partner play
+    }
+  }
+
+  // Be more aggressive if:
+  // - We're dealer (advantage of leading)
+  // - We have concentrated suits
+  let bidThreshold = 7;
+
+  if (isDealer) bidThreshold -= 1;
+  if (hasConcentratedSuits(hand)) bidThreshold -= 1;
+
+  // Bid if hand is strong enough
+  if (handStrength >= bidThreshold && maxPossibleBid >= minBid) {
+    // Don't overbid - bid conservatively
+    const conservativeBid = Math.min(minBid, maxPossibleBid - 1);
+    if (conservativeBid >= minBid && canMakeBid(state, playerIndex, conservativeBid)) {
+      return conservativeBid;
+    }
+    if (canMakeBid(state, playerIndex, minBid)) {
+      return minBid;
+    }
+  }
+
+  // Opening bid if no one has bid yet
+  if (currentHighBid === 0 && maxPossibleBid >= 6 && handStrength >= 5) {
+    const openingBid = Math.min(maxPossibleBid - 2, 8);
+    return Math.max(5, openingBid);
   }
 
   return null; // Pass
 }
 
-// Choose trump suit
+// ============================================================================
+// IMPROVED TRUMP SELECTION
+// ============================================================================
+
 export function chooseAITrump(state, playerIndex) {
   const hand = state.hands[playerIndex];
   const myBid = state.bids[playerIndex];
@@ -43,7 +146,6 @@ export function chooseAITrump(state, playerIndex) {
   });
 
   // Find all suits that allow the bid
-  // Bid = pictures + suit_count, so suit_count = bid - pictures
   const requiredSuitCount = myBid - pictures;
   const validSuits = Object.keys(suitCounts).filter(suit =>
     suitCounts[suit] >= requiredSuitCount
@@ -54,19 +156,43 @@ export function chooseAITrump(state, playerIndex) {
     validSuits.push(SUITS.DIAMONDS);
   }
 
-  // Choose the strongest valid suit
-  const suitOrder = [SUITS.CLUBS, SUITS.SPADES, SUITS.HEARTS, SUITS.DIAMONDS];
-  for (const suit of suitOrder) {
-    if (validSuits.includes(suit)) {
-      return suit;
+  // Evaluate each valid suit based on strength
+  let bestSuit = SUITS.DIAMONDS;
+  let bestScore = -1;
+
+  for (const suit of validSuits) {
+    let score = 0;
+
+    // Count high cards in this suit
+    const suitCards = hand.filter(c => !c.isPicture && c.suit === suit);
+    const hasAce = suitCards.some(c => c.rank === RANKS.ACE);
+    const has10 = suitCards.some(c => c.rank === '10');
+    const hasKing = hand.some(c => c.rank === 'K' && c.suit === suit);
+
+    if (hasAce) score += 5;
+    if (has10) score += 4;
+    if (hasKing) score += 2;
+
+    // Prefer longer suits
+    score += suitCounts[suit];
+
+    // Slight preference for traditional strong suits
+    if (suit === SUITS.CLUBS) score += 0.5;
+    if (suit === SUITS.SPADES) score += 0.3;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestSuit = suit;
     }
   }
 
-  // Fallback to diamonds
-  return SUITS.DIAMONDS;
+  return bestSuit;
 }
 
-// AI card playing logic
+// ============================================================================
+// IMPROVED CARD PLAYING LOGIC
+// ============================================================================
+
 export function chooseAICard(state, playerIndex) {
   const hand = state.hands[playerIndex];
   const legalCards = hand.filter(card => canPlayCard(state, playerIndex, card));
@@ -75,61 +201,119 @@ export function chooseAICard(state, playerIndex) {
   if (legalCards.length === 1) return legalCards[0];
 
   const isLeading = state.currentTrick.length === 0;
-  const partner = (playerIndex + 2) % 4;
   const team = playerIndex % 2;
+  const playedCards = getPlayedCards(state);
 
   if (isLeading) {
-    // Leading: play either a suit ace or a low card (6, 7, 8, 9)
-    const aces = legalCards.filter(card =>
-      !card.isPicture && card.rank === RANKS.ACE
-    );
-
-    if (aces.length > 0) {
-      // Play an ace
-      return aces[0];
-    }
-
-    // Find low cards (6, 7, 8, 9)
-    const lowCards = legalCards.filter(card =>
-      !card.isPicture &&
-      (card.rank === '6' || card.rank === '7' || card.rank === '8' || card.rank === '9')
-    );
-
-    if (lowCards.length > 0) {
-      // Play lowest card
-      return lowCards[lowCards.length - 1];
-    }
-
-    // If no aces or low cards, play the lowest card available
-    return legalCards[legalCards.length - 1];
+    return chooseLeadingCard(legalCards, hand, state, playedCards);
   } else {
-    // Following: smart play based on who's winning
-    const currentWinner = getCurrentTrickWinner(state);
-    const winnerTeam = currentWinner % 2;
-    const ourTeamIsWinning = winnerTeam === team;
+    return chooseFollowingCard(legalCards, hand, state, playerIndex, team, playedCards);
+  }
+}
 
-    // Try to win the trick
-    const winningCards = legalCards.filter(card =>
-      canWinTrick(state, card, playerIndex)
+function chooseLeadingCard(legalCards, hand, state, playedCards) {
+  // Strategy when leading:
+  // 1. Lead Aces to clear them early and win tricks
+  // 2. Lead from strongest suit
+  // 3. Probe with low cards from weak suits
+
+  const aces = legalCards.filter(c => !c.isPicture && c.rank === RANKS.ACE);
+  if (aces.length > 0) {
+    // Lead an Ace - choose from longest suit
+    const suitCounts = {};
+    aces.forEach(ace => {
+      const count = hand.filter(c => !c.isPicture && c.suit === ace.suit).length;
+      suitCounts[ace.suit] = count;
+    });
+    const bestAce = aces.reduce((best, ace) =>
+      suitCounts[ace.suit] > suitCounts[best.suit] ? ace : best
     );
+    return bestAce;
+  }
 
-    if (winningCards.length > 0) {
-      // We can win - play the highest winning card
-      return winningCards[0];
+  // Find strongest suit (most cards or high cards)
+  const suitStrength = {};
+  Object.values(SUITS).forEach(suit => {
+    const suitCards = legalCards.filter(c => !c.isPicture && c.suit === suit);
+    if (suitCards.length > 0) {
+      let strength = suitCards.length;
+      if (suitCards.some(c => c.rank === '10')) strength += 2;
+      if (suitCards.some(c => c.rank === '9')) strength += 0.5;
+      suitStrength[suit] = strength;
     }
+  });
 
-    // Can't win the trick
-    if (ourTeamIsWinning) {
-      // Partner/teammate is winning - add high points!
-      // Sort by points (descending) and play the highest point card
-      const sortedByPoints = [...legalCards].sort((a, b) => b.points - a.points);
-      return sortedByPoints[0];
-    } else {
-      // Opponent is winning - play lowest card to save points
-      // Sort by points (ascending) and play the lowest point card
-      const sortedByPoints = [...legalCards].sort((a, b) => a.points - b.points);
+  const strongestSuit = Object.keys(suitStrength).reduce((best, suit) =>
+    suitStrength[suit] > (suitStrength[best] || 0) ? suit : best
+  , null);
+
+  if (strongestSuit) {
+    const strongSuitCards = legalCards.filter(c => !c.isPicture && c.suit === strongestSuit);
+    // Lead highest card from strong suit
+    if (strongSuitCards.length > 0) {
+      return strongSuitCards[0];
+    }
+  }
+
+  // Fallback: play lowest card
+  return legalCards[legalCards.length - 1];
+}
+
+function chooseFollowingCard(legalCards, hand, state, playerIndex, team, playedCards) {
+  const currentWinner = getCurrentTrickWinner(state);
+  const winnerTeam = currentWinner % 2;
+  const ourTeamIsWinning = winnerTeam === team;
+  const isLastToPlay = state.currentTrick.length === 3;
+
+  // Check for "2nd round 10" situation
+  const leadCard = state.currentTrick[0].card;
+  const suitPlayedCount = countSuitPlayed(playedCards, leadCard.suit);
+  const ten = state.currentTrick.find(p => p.card.rank === '10' && !p.card.isPicture);
+
+  if (ten && suitPlayedCount >= 4) {
+    // This is 2nd round of this suit and someone played a 10
+    // Try to trump it with highest trump if we can't follow suit
+    const trumpCards = legalCards.filter(c =>
+      (c.isPicture || c.suit === state.trumpSuit) && !c.suit === leadCard.suit
+    );
+    if (trumpCards.length > 0) {
+      // Use highest trump to take the 10
+      return trumpCards[0];
+    }
+  }
+
+  // Try to win the trick
+  const winningCards = legalCards.filter(card =>
+    canWinTrick(state, card, playerIndex)
+  );
+
+  if (winningCards.length > 0) {
+    // We can win - use LOWEST winning card (don't waste high cards)
+    return winningCards[winningCards.length - 1];
+  }
+
+  // Can't win the trick
+  if (ourTeamIsWinning && isLastToPlay) {
+    // Partner is winning and we're last - give points!
+    // But save Kings and Queens for later tricks (they can win more)
+    const nonRoyalCards = legalCards.filter(c => c.rank !== 'K' && c.rank !== 'Q');
+    if (nonRoyalCards.length > 0) {
+      // Give highest points from non-royal cards
+      const sortedByPoints = [...nonRoyalCards].sort((a, b) => b.points - a.points);
       return sortedByPoints[0];
     }
+    // If only royals left, give highest points
+    const sortedByPoints = [...legalCards].sort((a, b) => b.points - a.points);
+    return sortedByPoints[0];
+  } else if (ourTeamIsWinning) {
+    // Partner is winning but we're not last - play safe middle card
+    const sortedByPoints = [...legalCards].sort((a, b) => a.points - b.points);
+    const midIndex = Math.floor(sortedByPoints.length / 2);
+    return sortedByPoints[midIndex];
+  } else {
+    // Opponent is winning - play LOWEST card to save points
+    const sortedByPoints = [...legalCards].sort((a, b) => a.points - b.points);
+    return sortedByPoints[0];
   }
 }
 
