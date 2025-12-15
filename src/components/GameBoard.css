@@ -131,8 +131,9 @@
     transform: scale(1.05);
 }
 
-.pass-button {
-    padding: 8px 20px;
+.bid-buttons .pass-button {
+    padding: 8px 8px;
+    margin-left: 5px;
     background: #f44336;
     color: white;
     border: none;
@@ -239,7 +240,7 @@
 
 .bottom-overlay {
     position: absolute;
-    bottom: 5px;
+    bottom: 60px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
@@ -274,7 +275,7 @@
 }
 
 .next-round-button {
-    padding: 15px 20px;
+    padding: 12px 10px;
     background: #4CAF50;
     color: white;
     border: none;
@@ -284,6 +285,8 @@
     font-weight: bold;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     transition: all 0.2s ease;
+    display: block;
+    margin: 0 auto;
 }
 
 .next-round-button:hover {
@@ -499,7 +502,7 @@
 /* Mobile responsive */
 @media (max-width: 768px) {
     .game-board {
-        padding: 5px;
+        padding: 2px;
     }
 
     .corner-info {
@@ -536,7 +539,7 @@
         width: calc(100% - 10px);
         max-width: 400px;
         height: 400px;
-        margin: 20px auto;
+        margin: 5px auto;
     }
 
     .player-label {
@@ -545,11 +548,40 @@
     }
 
     .player-hand-container {
-        margin: 20px auto;
+        margin: 10px auto;
+    }
+
+    .center-overlay {
+        width: 95%;
+        max-width: none;
     }
 
     .overlay-content {
-        padding: 8px 20px;
+        padding: 7px 7px;
+    }
+
+    .pack-choice-grid {
+        gap: 7px;
+    }
+
+    .pack-choice {
+        padding: 5px;
+    }
+
+    .pack-cards {
+        gap: 5px;
+    }
+
+    .deal-choice-button {
+        padding: 12px 15px;
+    }
+
+    .deal-choice-title {
+        font-size: 16px;
+    }
+
+    .deal-choice-desc {
+        font-size: 12px;
     }
 
     .bid-buttons button,

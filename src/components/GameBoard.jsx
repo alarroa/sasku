@@ -271,8 +271,8 @@ export default function GameBoard() {
           <button className="ruutu-button" onClick={handleRuutuBid}>
             {et.bidding.ruutuButton}
           </button>
+            <button className="pass-button" onClick={handlePass}>{et.bidding.pass}</button>
         </div>
-        <button className="pass-button" onClick={handlePass}>{et.bidding.pass}</button>
       </>
     );
   };

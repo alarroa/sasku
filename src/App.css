@@ -51,8 +51,8 @@
 
 @media (max-width: 768px) {
   .app-header {
-    padding: 10px;
-    min-height: 40px;
+    padding: 8px;
+    min-height: 30px;
   }
 
   .app-header h1 {
