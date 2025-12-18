@@ -49,13 +49,19 @@ export const et = {
     theirTeam: 'Teie',
     trickPoints: 'Punkte:',
     trickPointsLabel: 'punkti',
-    nextRound: 'Järgmine voor'
+    nextRound: 'Järgmine voor',
+    roundOver: 'Voor läbi!',
+    roundWinner: 'Vooru võitja: {winner}',
+    pokk: 'Pokk!',
+    pokkMessage: 'Viik 60-60! Mängitakse uuesti, võitja saab +2 punkti'
   },
 
   // Game end
   gameEnd: {
-    gameOver: 'Mäng läbi!',
+    gameOver: 'Partii läbi!',
     winner: 'Võitja: {winner}',
-    newGame: 'Uus mäng'
+    newMatch: 'Uus partii',
+    newGame: 'Uus mäng',
+    matchWins: 'Partiid'
   }
 };

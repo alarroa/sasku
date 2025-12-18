@@ -25,6 +25,7 @@ export function createInitialState() {
     // Deal choice state
     dealOption: null,
     pimeRuutuBonus: false,
+    pokkBonus: false, // +2 bonus for winning after a 60-60 tie
     cardPacks: null, // For "valida" option
 
     // Bidding state
@@ -42,6 +43,7 @@ export function createInitialState() {
     // Scoring
     roundScores: [0, 0], // Team 0 (players 0&2) vs Team 1 (players 1&3)
     gameScores: [0, 0],
+    matchWins: [0, 0], // Track match wins across multiple games
 
     // History
     lastTrick: null
@@ -474,17 +476,29 @@ function calculateRoundScore(state) {
 
   state.roundScores = teamPoints;
 
+  // Check for Pokk (60-60 tie)
+  if (teamPoints[0] === 60 && teamPoints[1] === 60) {
+    // Pokk! No points awarded, next round winner gets +2 bonus
+    state.pokkBonus = true;
+    return; // Don't award any points, just end the round
+  }
+
   // Determine round winner and calculate game points
   const trumpMakerTeam = state.trumpMaker !== null ? getTeam(state.trumpMaker) : null;
+  const hadPokkBonus = state.pokkBonus;
+  state.pokkBonus = false; // Reset after checking
 
   // Üleküla ruutu (no trump maker)
   if (trumpMakerTeam === null) {
     if (teamPoints[0] > teamPoints[1]) {
-      state.gameScores[0] += 2;
+      let points = 2;
+      if (hadPokkBonus) points += 2; // Pokk bonus
+      state.gameScores[0] += points;
     } else if (teamPoints[1] > teamPoints[0]) {
-      state.gameScores[1] += 2;
+      let points = 2;
+      if (hadPokkBonus) points += 2; // Pokk bonus
+      state.gameScores[1] += points;
     }
-    // Pokk (tie) - no points, play again
   } else {
     const trumpMakerPoints = teamPoints[trumpMakerTeam];
     const defenderPoints = teamPoints[1 - trumpMakerTeam];
@@ -497,17 +511,20 @@ function calculateRoundScore(state) {
       // Trump maker got all tricks (karvane)
       let points = 6;
       if (state.pimeRuutuBonus) points += 2; // Pime ruutu bonus
+      if (hadPokkBonus) points += 2; // Pokk bonus
       state.gameScores[trumpMakerTeam] += points;
     } else if (trumpMakerTricks === 0) {
       // Defenders got all tricks (karvane)
       let points = 6;
       if (state.pimeRuutuBonus) points += 2; // Pime ruutu bonus goes to defenders
+      if (hadPokkBonus) points += 2; // Pokk bonus
       state.gameScores[1 - trumpMakerTeam] += points;
     } else if (trumpMakerPoints >= 61) {
       // Trump maker won
       let points = state.trumpSuit === SUITS.DIAMONDS ? 4 : 2;
       if (defenderPoints < 30) points += 2; // Jänn
       if (state.pimeRuutuBonus) points += 2; // Pime ruutu bonus
+      if (hadPokkBonus) points += 2; // Pokk bonus
       state.gameScores[trumpMakerTeam] += points;
     } else {
       // Trump was beaten
@@ -515,12 +532,19 @@ function calculateRoundScore(state) {
       points += 2; // Bonus for beating opponent's trump
       if (trumpMakerPoints < 30) points += 2; // Jänn
       if (state.pimeRuutuBonus) points += 2; // Pime ruutu bonus goes to defenders
+      if (hadPokkBonus) points += 2; // Pokk bonus
       state.gameScores[1 - trumpMakerTeam] += points;
     }
   }
 
-  // Check for game end (16 points)
-  if (state.gameScores[0] >= 16 || state.gameScores[1] >= 16) {
+  // Cap scores at 16 and check for game end
+  if (state.gameScores[0] >= 16) {
+    state.gameScores[0] = 16;
+    state.matchWins[0] += 1;
+    state.phase = GAME_PHASES.GAME_END;
+  } else if (state.gameScores[1] >= 16) {
+    state.gameScores[1] = 16;
+    state.matchWins[1] += 1;
     state.phase = GAME_PHASES.GAME_END;
   }
 }
@@ -533,6 +557,20 @@ export function startNewRound(state) {
     dealer: newDealer,
     currentPlayer: getNextPlayer(newDealer),
     gameScores: state.gameScores,
+    matchWins: state.matchWins,
+    pokkBonus: state.pokkBonus,
+    phase: GAME_PHASES.DEAL_CHOICE
+  };
+}
+
+export function startNewMatch(state) {
+  const newDealer = getNextPlayer(state.dealer);
+
+  return {
+    ...createInitialState(),
+    dealer: newDealer,
+    currentPlayer: getNextPlayer(newDealer),
+    matchWins: state.matchWins,
     phase: GAME_PHASES.DEAL_CHOICE
   };
 }

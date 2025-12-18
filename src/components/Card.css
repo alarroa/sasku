@@ -43,6 +43,15 @@
   border-color: #999;
 }
 
+/* During bidding (active + disabled), cards look normal but can't be clicked */
+.card.active.disabled {
+  opacity: 1;
+  filter: none;
+  cursor: default;
+  border-color: #2196F3;
+  border-width: 3px;
+}
+
 .card.red {
   color: #d32f2f;
 }

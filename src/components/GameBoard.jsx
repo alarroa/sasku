@@ -13,6 +13,7 @@ import {
   chooseDealOption,
   chooseCardPack,
   startNewRound,
+  startNewMatch,
   getTeam,
   getNextPlayer
 } from '../game/gameState';
@@ -31,7 +32,16 @@ export default function GameBoard() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const loadedState = JSON.parse(saved);
+        // Ensure matchWins exists (for backwards compatibility)
+        if (!loadedState.matchWins) {
+          loadedState.matchWins = [0, 0];
+        }
+        // Ensure pokkBonus exists (for backwards compatibility)
+        if (loadedState.pokkBonus === undefined) {
+          loadedState.pokkBonus = false;
+        }
+        return loadedState;
       }
     } catch (error) {
       console.error('Failed to load game state:', error);
@@ -410,11 +420,11 @@ export default function GameBoard() {
           <div className="corner-scores">
             <div className="corner-score-row">
               <span className="score-label">{et.scoring.ourTeam}:</span>
-              <span className="score-value">{gameState.gameScores[0]}</span>
+              <span className="score-value">{gameState.gameScores[0]} | {gameState.matchWins[0]}</span>
             </div>
             <div className="corner-score-row">
               <span className="score-label">{et.scoring.theirTeam}:</span>
-              <span className="score-value">{gameState.gameScores[1]}</span>
+              <span className="score-value">{gameState.gameScores[1]} | {gameState.matchWins[1]}</span>
             </div>
           </div>
         </div>
@@ -439,9 +449,19 @@ export default function GameBoard() {
         {/* Center overlay for round end */}
         {gameState.phase === GAME_PHASES.ROUND_END && (
           <div className="center-overlay">
-            <button className="next-round-button" onClick={handleNewRound}>
-              {et.scoring.nextRound}
-            </button>
+            <div className="round-end-content">
+              {(() => {
+                // Check for Pokk (60-60 tie)
+                const isPokk = gameState.roundScores[0] === 60 && gameState.roundScores[1] === 60;
+                const buttonText = isPokk ? `${et.scoring.pokk} - ${et.scoring.nextRound}` : et.scoring.nextRound;
+
+                return (
+                  <button className="next-round-button" onClick={handleNewRound}>
+                    {buttonText}
+                  </button>
+                );
+              })()}
+            </div>
           </div>
         )}
         {positions.map(({ index, className, name }) => {
@@ -535,8 +555,8 @@ export default function GameBoard() {
             )}
           </div>
           <div className="score-totals">
-            <div className="score-total">{gameState.gameScores[0]}</div>
-            <div className="score-total">{gameState.gameScores[1]}</div>
+            <div className="score-total">{gameState.gameScores[0]} | {gameState.matchWins[0]}</div>
+            <div className="score-total">{gameState.gameScores[1]} | {gameState.matchWins[1]}</div>
           </div>
         </div>
 
@@ -557,6 +577,10 @@ export default function GameBoard() {
     );
   };
 
+  const handleNewMatch = () => {
+    setGameState(startNewMatch(gameState));
+  };
+
   const renderGameEnd = () => {
     if (gameState.phase !== GAME_PHASES.GAME_END) return null;
 
@@ -564,11 +588,16 @@ export default function GameBoard() {
 
     return (
       <div className="game-end">
-        <h2>{et.gameEnd.gameOver}</h2>
-        <p>{et.gameEnd.winner.replace('{winner}', winner)}</p>
+        <h3>{et.gameEnd.gameOver}</h3>
         <p className="final-score">
           {et.scoring.ourTeam}: {gameState.gameScores[0]} - {et.scoring.theirTeam}: {gameState.gameScores[1]}
         </p>
+        <h3 className="match-wins">
+          {et.gameEnd.matchWins}: {et.scoring.ourTeam} {gameState.matchWins[0]} - {et.scoring.theirTeam} {gameState.matchWins[1]}
+        </h3>
+        <button onClick={handleNewMatch} className="new-match-button">
+          {et.gameEnd.newMatch}
+        </button>
       </div>
     );
   };
