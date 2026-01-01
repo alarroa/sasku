@@ -31,6 +31,7 @@ export function createInitialState() {
     // Bidding state
     bids: [null, null, null, null],
     hasPassed: [false, false, false, false],
+    hasExchangedPicture: [false, false, false, false], // Track if player exchanged picture with partner
     lastBidder: null,
     trumpSuit: null,
     trumpMaker: null,
@@ -220,6 +221,49 @@ export function passBid(state, playerIndex) {
   }
 
   return newState;
+}
+
+export function exchangePicture(state, playerIndex, pictureCard, partnerCard) {
+  const newState = { ...state };
+  const partnerIndex = getPartner(playerIndex);
+
+  // Copy hands
+  newState.hands = state.hands.map(hand => [...hand]);
+
+  // Remove picture from player's hand
+  newState.hands[playerIndex] = newState.hands[playerIndex].filter(c => c.id !== pictureCard.id);
+
+  // Remove partner's card from partner's hand
+  newState.hands[partnerIndex] = newState.hands[partnerIndex].filter(c => c.id !== partnerCard.id);
+
+  // Add picture to partner's hand
+  newState.hands[partnerIndex].push(pictureCard);
+
+  // Add partner's card to player's hand
+  newState.hands[playerIndex].push(partnerCard);
+
+  // Mark that this player has exchanged
+  newState.hasExchangedPicture = [...state.hasExchangedPicture];
+  newState.hasExchangedPicture[playerIndex] = true;
+  newState.hasExchangedPicture[partnerIndex] = true; // Partner also can't exchange now
+
+  return newState;
+}
+
+export function canExchangePicture(state, playerIndex) {
+  // Can only exchange during bidding phase
+  if (state.phase !== GAME_PHASES.BIDDING) return false;
+
+  // Can't exchange if already exchanged
+  if (state.hasExchangedPicture && state.hasExchangedPicture[playerIndex]) return false;
+
+  // Must have exactly 1 picture card
+  const hand = state.hands[playerIndex];
+  if (!hand) return false;
+
+  const pictures = hand.filter(c => c.isPicture);
+
+  return pictures.length === 1;
 }
 
 export function chooseTrump(state, suit) {

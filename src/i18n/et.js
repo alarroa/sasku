@@ -40,6 +40,8 @@ export const et = {
     omale: 'Omale',
     chooseTrump: 'Vali trump:',
     ruutuButton: 'Ruutu',
+    exchangePicture: 'Anna pilti',
+    selectCardToReceive: 'Vali kaart, mida soovid saada:',
   },
 
   // Scoring

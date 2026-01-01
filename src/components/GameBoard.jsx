@@ -15,7 +15,10 @@ import {
   startNewRound,
   startNewMatch,
   getTeam,
-  getNextPlayer
+  getNextPlayer,
+  exchangePicture,
+  canExchangePicture,
+  getPartner
 } from '../game/gameState';
 import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
 import { SUITS, SUIT_NAMES_ET, SUIT_SYMBOLS, calculateBiddingValue } from '../game/cards';
@@ -40,6 +43,10 @@ export default function GameBoard() {
         // Ensure pokkBonus exists (for backwards compatibility)
         if (loadedState.pokkBonus === undefined) {
           loadedState.pokkBonus = false;
+        }
+        // Ensure hasExchangedPicture exists (for backwards compatibility)
+        if (!loadedState.hasExchangedPicture) {
+          loadedState.hasExchangedPicture = [false, false, false, false];
         }
         return loadedState;
       }
@@ -216,6 +223,41 @@ export default function GameBoard() {
     setGameState(newState);
   };
 
+  const handleExchangePictureClick = () => {
+    // Find the player's picture card
+    const pictureCard = gameState.hands[0].find(c => c.isPicture);
+    if (!pictureCard) return;
+
+    // Partner (AI) chooses which card to give
+    const partnerIndex = getPartner(0);
+    const partnerHand = gameState.hands[partnerIndex];
+
+    // AI strategy: give away a card from a suit where they have only 1 card
+    // This helps create a void suit for trumping
+    const suitCounts = {};
+    partnerHand.filter(c => !c.isPicture).forEach(c => {
+      suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+    });
+
+    // Find a card from a singleton suit (only 1 card in that suit)
+    let cardToGive = partnerHand.find(c =>
+      !c.isPicture && suitCounts[c.suit] === 1
+    );
+
+    // If no singleton, give lowest value card
+    if (!cardToGive) {
+      const sortedByValue = [...partnerHand]
+        .filter(c => !c.isPicture)
+        .sort((a, b) => a.points - b.points);
+      cardToGive = sortedByValue[0];
+    }
+
+    if (cardToGive) {
+      const newState = exchangePicture(gameState, 0, pictureCard, cardToGive);
+      setGameState(newState);
+    }
+  };
+
   const shouldShowBiddingControls = () => {
     return gameState.phase === GAME_PHASES.BIDDING &&
            gameState.currentPlayer === 0 &&
@@ -307,6 +349,8 @@ export default function GameBoard() {
       possibleBids.push(i);
     }
 
+    const canExchange = canExchangePicture(gameState, 0);
+
     return (
       <>
         <h3>{et.bidding.yourBid}</h3>
@@ -324,7 +368,12 @@ export default function GameBoard() {
           <button className="ruutu-button" onClick={handleRuutuBid}>
             {et.bidding.ruutuButton}
           </button>
-            <button className="pass-button" onClick={handlePass}>{et.bidding.pass}</button>
+          {canExchange && (
+            <button className="exchange-button" onClick={handleExchangePictureClick}>
+              {et.bidding.exchangePicture}
+            </button>
+          )}
+          <button className="pass-button" onClick={handlePass}>{et.bidding.pass}</button>
         </div>
       </>
     );
