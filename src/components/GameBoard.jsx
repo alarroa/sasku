@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Hand from './Hand';
 import Card from './Card';
 import {
@@ -49,6 +49,10 @@ export default function GameBoard() {
     return createInitialState();
   });
 
+  // Track when to hide last trick cards
+  const [hideLastTrick, setHideLastTrick] = useState(false);
+  const lastTrickRef = useRef(null);
+
   // Save game state to localStorage whenever it changes
   useEffect(() => {
     try {
@@ -70,6 +74,36 @@ export default function GameBoard() {
       return () => clearTimeout(timer);
     }
   }, [gameState]);
+
+  // Handle hiding last trick cards after 2.5 seconds
+  useEffect(() => {
+    if (gameState.lastTrick && gameState.currentTrick.length === 0 && gameState.phase === GAME_PHASES.PLAYING) {
+      // New trick completed
+      const trickId = gameState.lastTrick.trick.map(p => p.card.id).join(',');
+
+      if (lastTrickRef.current !== trickId) {
+        // This is a new trick, schedule hiding after 2.5s
+        lastTrickRef.current = trickId;
+
+        // Start timer to hide cards
+        const timer = setTimeout(() => {
+          setHideLastTrick(true);
+        }, 2500);
+
+        return () => clearTimeout(timer);
+      }
+    } else {
+      // No last trick or not in playing phase
+      lastTrickRef.current = null;
+    }
+  }, [gameState.lastTrick, gameState.currentTrick.length, gameState.phase]);
+
+  // Reset hideLastTrick when a new trick starts
+  useEffect(() => {
+    if (gameState.currentTrick.length > 0) {
+      setHideLastTrick(false);
+    }
+  }, [gameState.currentTrick.length]);
 
   // AI turn handling
   useEffect(() => {
@@ -107,6 +141,15 @@ export default function GameBoard() {
         if (card) {
           const newState = playCard(gameState, playerIndex, card);
           setGameState(newState);
+        } else {
+          // Safety fallback: if AI can't choose a card, play the first legal card
+          console.error('AI could not choose a card, using fallback');
+          const hand = gameState.hands[playerIndex];
+          const fallbackCard = hand.find(c => canPlayCard(gameState, playerIndex, c));
+          if (fallbackCard) {
+            const newState = playCard(gameState, playerIndex, fallbackCard);
+            setGameState(newState);
+          }
         }
       }
     }, delay);
@@ -365,8 +408,10 @@ export default function GameBoard() {
     const play = gameState.currentTrick.find(p => p.player === playerIndex);
     if (play) return play.card;
 
-    // Also show last completed trick (for the 2.5s delay or during round end)
-    if (gameState.lastTrick && (gameState.currentTrick.length === 0 || gameState.phase === GAME_PHASES.ROUND_END)) {
+    // Show last completed trick (for 2.5s delay or during round end)
+    if (gameState.lastTrick &&
+        (gameState.currentTrick.length === 0 || gameState.phase === GAME_PHASES.ROUND_END) &&
+        !hideLastTrick) {
       const lastPlay = gameState.lastTrick.trick.find(p => p.player === playerIndex);
       if (lastPlay) return lastPlay.card;
     }
