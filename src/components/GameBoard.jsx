@@ -116,6 +116,8 @@ export default function GameBoard() {
   useEffect(() => {
     if (gameState.currentPlayer === 0) return; // Human player
 
+    console.log(`AI turn: Player ${gameState.currentPlayer}, Phase: ${gameState.phase}`);
+
     // If trick just completed (4 cards), wait longer to show the result
     const trickJustCompleted = gameState.lastTrick &&
                                gameState.lastTrick.trick.length === 4 &&
@@ -127,25 +129,78 @@ export default function GameBoard() {
       const playerIndex = gameState.currentPlayer;
 
       if (gameState.phase === GAME_PHASES.DEAL_CHOICE) {
-        // AI always chooses "Tõstan" (normal deal)
-        setGameState(chooseDealOption(gameState, DEAL_OPTIONS.TOSTAN));
+        // AI chooses deal option randomly (cards not dealt yet!)
+        const rand = Math.random();
+
+        // 15% chance for Pime Ruutu (risky but +2 bonus)
+        if (rand < 0.15) {
+          console.log(`AI ${playerIndex} chose Pime Ruutu`);
+          setGameState(chooseDealOption(gameState, DEAL_OPTIONS.PIME_RUUTU));
+        }
+        // 10% chance for Valida (get to choose pack)
+        else if (rand < 0.25) {
+          console.log(`AI ${playerIndex} chose Valida`);
+          setGameState(chooseDealOption(gameState, DEAL_OPTIONS.VALIDA));
+        }
+        // 75% chance for Tõstan (safe default)
+        else {
+          console.log(`AI ${playerIndex} chose Tõstan`);
+          setGameState(chooseDealOption(gameState, DEAL_OPTIONS.TOSTAN));
+        }
+      } else if (gameState.phase === GAME_PHASES.PACK_CHOICE) {
+        // AI chooses a random pack
+        const packIndex = Math.floor(Math.random() * gameState.cardPacks.length);
+        console.log(`AI ${playerIndex} chose pack ${packIndex}`);
+        setGameState(chooseCardPack(gameState, playerIndex, packIndex));
       } else if (gameState.phase === GAME_PHASES.BIDDING) {
+        // Check if AI can exchange picture with partner
+        if (canExchangePicture(gameState, playerIndex) && Math.random() < 0.7) {
+          // AI exchanges picture 70% of the time if possible
+          const pictureCard = gameState.hands[playerIndex].find(c => c.isPicture);
+          const partnerIndex = getPartner(playerIndex);
+          const partnerHand = gameState.hands[partnerIndex];
+
+          // Choose which card to give (same logic as human player's partner)
+          const suitCounts = {};
+          partnerHand.filter(c => !c.isPicture).forEach(c => {
+            suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+          });
+
+          let cardToGive = partnerHand.find(c => !c.isPicture && suitCounts[c.suit] === 1);
+          if (!cardToGive) {
+            const sortedByValue = [...partnerHand]
+              .filter(c => !c.isPicture)
+              .sort((a, b) => a.points - b.points);
+            cardToGive = sortedByValue[0];
+          }
+
+          if (pictureCard && cardToGive) {
+            console.log(`AI ${playerIndex} exchanged picture ${pictureCard.rank} for ${cardToGive.rank}${cardToGive.suit}`);
+            setGameState(exchangePicture(gameState, playerIndex, pictureCard, cardToGive));
+            return;
+          }
+        }
+
         // Check if this player needs to choose trump
         if (gameState.trumpMaker === playerIndex && !gameState.trumpSuit) {
           const trump = chooseAITrump(gameState, playerIndex);
+          console.log(`AI ${playerIndex} chose trump: ${trump}`);
           const newState = chooseTrump(gameState, trump);
           setGameState(newState);
         } else {
           const bid = makeAIBid(gameState, playerIndex);
           if (bid !== null) {
+            console.log(`AI ${playerIndex} bid: ${bid}`);
             setGameState(makeBid(gameState, playerIndex, bid));
           } else {
+            console.log(`AI ${playerIndex} passed`);
             setGameState(passBid(gameState, playerIndex));
           }
         }
       } else if (gameState.phase === GAME_PHASES.PLAYING) {
         const card = chooseAICard(gameState, playerIndex);
         if (card) {
+          console.log(`AI ${playerIndex} played: ${card.rank}${card.suit}`);
           const newState = playCard(gameState, playerIndex, card);
           setGameState(newState);
         } else {
@@ -154,8 +209,11 @@ export default function GameBoard() {
           const hand = gameState.hands[playerIndex];
           const fallbackCard = hand.find(c => canPlayCard(gameState, playerIndex, c));
           if (fallbackCard) {
+            console.log(`AI ${playerIndex} fallback card: ${fallbackCard.rank}${fallbackCard.suit}`);
             const newState = playCard(gameState, playerIndex, fallbackCard);
             setGameState(newState);
+          } else {
+            console.error(`AI ${playerIndex} has no playable cards! Game stuck.`);
           }
         }
       }
