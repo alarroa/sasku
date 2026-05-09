@@ -210,14 +210,15 @@ export function passBid(state, playerIndex) {
     newState.leadPlayer = getNextPlayer(newState.dealer);
     newState.currentPlayer = newState.leadPlayer;
   }
-  // Three passed - winner determined
+  // Three passed - winner determined only if someone has actually bid
   else if (passCount === 3) {
     const winnerIndex = newState.bids.findIndex((bid, i) => bid !== null && !newState.hasPassed[i]);
-    newState.trumpMaker = winnerIndex;
-    newState.currentPlayer = winnerIndex;
-    // Trump will be chosen by AI or shown to human
-    // For now, stay in BIDDING phase until trump is chosen
-    // Or automatically choose for AI
+    if (winnerIndex !== -1) {
+      newState.trumpMaker = winnerIndex;
+      newState.currentPlayer = winnerIndex;
+    }
+    // else: no one has bid yet — let the 4th player take their turn
+    // (currentPlayer was already advanced above; if they also pass, passCount===4 triggers üleküla ruutu)
   }
 
   return newState;
