@@ -77,7 +77,7 @@ export default function GameBoard() {
       // Player has already passed, skip their turn
       const timer = setTimeout(() => {
         setGameState(passBid(gameState, 0));
-      }, 300);
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [gameState]);
@@ -95,7 +95,7 @@ export default function GameBoard() {
         // Start timer to hide cards
         const timer = setTimeout(() => {
           setHideLastTrick(true);
-        }, 2500);
+        }, 2000);
 
         return () => clearTimeout(timer);
       }
@@ -123,7 +123,7 @@ export default function GameBoard() {
                                gameState.lastTrick.trick.length === 4 &&
                                gameState.currentTrick.length === 0;
 
-    const delay = trickJustCompleted ? 2500 : 600; // 2.5s for completed trick, 600ms normally
+    const delay = trickJustCompleted ? 2000 : 250; // 2s for completed trick, 250ms normally
 
     const timer = setTimeout(() => {
       const playerIndex = gameState.currentPlayer;
