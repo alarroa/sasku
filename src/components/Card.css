@@ -1,33 +1,38 @@
 .card {
-  width: 70px;
-  height: 100px;
-  border: 2px solid #333;
-  border-radius: 8px;
+  width: 85px;
+  height: 119px; /* 5:7 ratio for SVG cards */
+  border-radius: 6px;
   background: white;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
   position: relative;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, outline-color 0.2s;
   user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  overflow: hidden;
+}
+
+.card-svg-wrapper {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
 }
 
 .card:hover:not(.disabled) {
   transform: translateY(-10px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
 .card.selected {
   transform: translateY(-15px);
-  border-color: #4CAF50;
-  box-shadow: 0 6px 12px rgba(76, 175, 80, 0.3);
+  outline-color: #4CAF50;
+  box-shadow: 0 6px 12px rgba(76, 175, 80, 0.4);
 }
 
 .card.active {
-  border-color: #2196F3;
-  border-width: 3px;
+  outline-color: #2196F3;
   box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
 }
 
@@ -37,10 +42,8 @@
 }
 
 .card.disabled {
-  opacity: 0.4;
   cursor: not-allowed;
-  filter: grayscale(60%);
-  border-color: #999;
+  filter: brightness(0.75) saturate(0.35);
 }
 
 /* During bidding (active + disabled), cards look normal but can't be clicked */
@@ -48,66 +51,32 @@
   opacity: 1;
   filter: none;
   cursor: default;
-  border-color: #2196F3;
-  border-width: 3px;
+  outline-color: #2196F3;
 }
 
-.card.red {
-  color: #d32f2f;
+/* Trump cards get a subtle gold outline */
+.card.trump {
+  outline-color: #c9a227;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(201, 162, 39, 0.3);
 }
 
-.card.black {
-  color: #000;
+.card.trump:hover:not(.disabled) {
+  box-shadow: 0 6px 12px rgba(201, 162, 39, 0.45);
 }
 
-.card-rank {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 5px;
+.card.trump.selected {
+  outline-color: #4CAF50;
 }
 
-.card-suit {
-  font-size: 32px;
-}
-
-.picture-badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #ff9800;
-  color: white;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
+.card.trump.active {
+  outline-color: #2196F3;
 }
 
 /* Mobile responsive */
 @media (max-width: 768px) {
   .card {
-    width: 65px;
-    height: 90px;
-  }
-
-  .card-rank {
-    font-size: 18px;
-    margin-bottom: 3px;
-  }
-
-  .card-suit {
-    font-size: 26px;
-  }
-
-  .picture-badge {
-    width: 18px;
-    height: 18px;
-    font-size: 11px;
-    top: 3px;
-    right: 3px;
+    width: 70px;
+    height: 98px;
   }
 
   .card:hover:not(.disabled) {

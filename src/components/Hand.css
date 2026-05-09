@@ -20,17 +20,25 @@
 
 .hand .cards {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 5px;
+  padding-top: 12px; /* room for hover lift */
 }
 
 .hand .cards .card {
-  margin: 0;
+  margin-left: -42px; /* overlap, exposing ~43px of left edge */
 }
 
-.hand .cards .card:hover:not(.card-back) {
+.hand .cards .card:first-child {
+  margin-left: 0;
+}
+
+.hand .cards .card:hover:not(.card-back):not(.disabled) {
   z-index: 10;
+}
+
+.hand .cards .card.selected,
+.hand .cards .card.active {
+  z-index: 5;
 }
 
 /* Card back styling */
@@ -52,13 +60,14 @@
 /* Mobile responsive */
 @media (max-width: 768px) {
   .hand .cards {
-    gap: 2px;
     max-width: 100%;
   }
 
   .hand .cards .card {
-    width: 60px;
-    height: 85px;
-    font-size: 14px;
+    margin-left: -35px; /* expose ~35px of left edge on mobile */
+  }
+
+  .hand .cards .card:first-child {
+    margin-left: 0;
   }
 }
