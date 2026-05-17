@@ -2,30 +2,17 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-}
-
-.hand .player-name {
-  font-size: 16px;
-  font-weight: bold;
-  color: white;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 5px 15px;
-  border-radius: 15px;
-}
-
-.hand.current-player .player-name {
-  background: #4CAF50;
+  gap: 6px;
 }
 
 .hand .cards {
   display: flex;
   justify-content: center;
-  padding-top: 12px; /* room for hover lift */
+  padding-top: 14px; /* room for hover lift */
 }
 
 .hand .cards .card {
-  margin-left: -42px; /* overlap, exposing ~43px of left edge */
+  margin-left: -42px;
 }
 
 .hand .cards .card:first-child {
@@ -41,11 +28,20 @@
   z-index: 5;
 }
 
-/* Card back styling */
+/* Card back styling — punase ristikriipsulise mustriga (mängib koos PlayerSpot kaardiseljaga) */
 .card-back {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      #6b2424 0px,
+      #6b2424 4px,
+      #5a1c1c 4px,
+      #5a1c1c 8px
+    ),
+    linear-gradient(135deg, #8b2a2a 0%, #5a1c1c 100%);
+  background-color: #6b2424;
   cursor: default;
-  border-color: #5a67d8;
+  border: 2px solid var(--paper);
 }
 
 .card-back:hover {
@@ -54,7 +50,7 @@
 
 .card-back-design {
   font-size: 48px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(245, 232, 200, 0.3);
 }
 
 /* Mobile responsive */
@@ -64,7 +60,7 @@
   }
 
   .hand .cards .card {
-    margin-left: -35px; /* expose ~35px of left edge on mobile */
+    margin-left: -38px;
   }
 
   .hand .cards .card:first-child {

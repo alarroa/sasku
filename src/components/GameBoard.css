@@ -1,281 +1,777 @@
+/* ============================================================
+   GAME BOARD — Eesti puidust mängulaud
+   ============================================================ */
+
 .game-board {
     width: 100%;
     min-height: 100vh;
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-    padding: 20px;
-    color: white;
+    background: var(--texture-wood);
+    background-color: var(--wood-dark);
+    color: var(--paper);
     position: relative;
     box-sizing: border-box;
-}
-
-.current-trick {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 20px;
-    border-radius: 8px;
-    margin: 20px auto;
-    max-width: 600px;
-    backdrop-filter: blur(10px);
-}
-
-.current-trick h3 {
-    margin-top: 0;
-    text-align: center;
-}
-
-.trick-cards {
     display: flex;
-    gap: 20px;
-    justify-content: center;
-    flex-wrap: wrap;
+    flex-direction: column;
+    padding-bottom: 12px;
 }
 
-.trick-card {
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.app-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 18px;
+    background:
+        linear-gradient(180deg, rgba(255, 220, 160, 0.06) 0%, rgba(0, 0, 0, 0.25) 100%),
+        var(--texture-wood);
+    background-color: var(--wood-dark);
+    border-bottom: 3px solid var(--wood-edge);
+    box-shadow:
+        inset 0 -1px 0 rgba(255, 220, 160, 0.12),
+        0 2px 6px rgba(0, 0, 0, 0.5);
+    min-height: 48px;
+    position: relative;
+    z-index: 20;
+}
+
+.app-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 24px;
+    color: var(--gold);
+    margin: 0;
+    letter-spacing: 0.08em;
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.6),
+        0 0 8px rgba(232, 200, 120, 0.15);
+    justify-self: start;
+}
+
+.header-scores {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-self: center;
+}
+
+.header-score-block {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 1px;
+    padding: 4px 12px;
+    background: var(--texture-paper);
+    background-color: var(--paper);
+    color: var(--ink);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gold-dim);
+    box-shadow: var(--shadow-paper);
+    font-family: var(--font-body);
+    line-height: 1.1;
 }
 
-.trick-player {
-    font-size: 14px;
-    font-weight: bold;
+.header-score-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    opacity: 0.85;
 }
 
-.completed-trick {
-    background: rgba(76, 175, 80, 0.15) !important;
-    border: 2px solid rgba(76, 175, 80, 0.5);
-}
-
-.completed-trick h3 {
-    color: #4CAF50;
-}
-
-.trick-card.winner {
-    position: relative;
-}
-
-.trick-card.winner::after {
-    content: '👑';
-    position: absolute;
-    top: -10px;
-    right: -10px;
-    font-size: 24px;
-    animation: bounce 0.5s ease-in-out;
-}
-
-@keyframes bounce {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(-10px);
-    }
-}
-
-.bid-buttons {
+.header-score-pair {
     display: flex;
+    align-items: baseline;
     gap: 5px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-bottom: 15px;
-    width: 100%;
-    box-sizing: border-box;
+    font-variant-numeric: tabular-nums;
 }
 
-.bid-buttons button {
-    padding: 10px 15px;
-    background: #2196F3;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+.header-score-team {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-soft);
+}
+
+.header-score-value {
     font-size: 16px;
-    font-weight: bold;
-    min-width: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    font-family: var(--font-display);
 }
 
-.bid-buttons button:hover {
-    background: #1976D2;
+.header-score-mini {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    margin-left: 1px;
 }
 
-.bid-buttons .ruutu-button {
-    padding: 10px 8px;
-    color: white;
-    border-radius: 5px;
+.header-score-sep {
+    color: var(--gold-dim);
+    font-weight: 600;
+    margin: 0 2px;
+}
+
+.header-menu {
+    position: relative;
+    justify-self: end;
+}
+
+.settings-button {
+    background:
+        linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-dim) 100%);
+    color: var(--ink);
+    border: 1px solid var(--wood-edge);
+    border-radius: var(--radius-md);
+    width: 38px;
+    height: 38px;
+    font-size: 20px;
     cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-}
-
-.bid-buttons .ruutu-button:hover {
-    transform: scale(1.05);
-}
-
-.omale-button {
-    padding: 10px 20px;
-    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.omale-button:hover {
-    background: linear-gradient(135deg, #F57C00 0%, #E65100 100%);
-    transform: scale(1.05);
-}
-
-.bid-buttons .pass-button {
-    padding: 8px 8px;
-    margin-left: 5px;
-    background: #f44336;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.bid-buttons .pass-button:hover {
-    background: #d32f2f;
-    transform: scale(1.05);
-}
-
-.trump-buttons {
     display: flex;
-    gap: 7px;
+    align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+        0 2px 4px rgba(0, 0, 0, 0.4);
+    transition: transform var(--transition-quick), box-shadow var(--transition-quick);
 }
 
-.trump-buttons button {
-    padding: 15px 30px;
-    background: #9C27B0;
-    color: white;
+.settings-button:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+        0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.settings-button:active {
+    transform: translateY(0);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.4),
+        0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.settings-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 160px;
+    background: var(--texture-paper);
+    background-color: var(--paper);
+    color: var(--ink);
+    border: 2px solid var(--gold-dim);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-wood-deep);
+    padding: 6px;
+    z-index: 30;
+}
+
+.settings-item {
+    width: 100%;
+    background: transparent;
+    color: var(--ink);
     border: none;
-    border-radius: 5px;
+    padding: 10px 14px;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
     cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
+    transition: background var(--transition-quick);
 }
 
-.trump-buttons button:hover {
-    background: #7B1FA2;
+.settings-item:hover {
+    background: rgba(140, 100, 40, 0.18);
 }
+
+/* ============================================================
+   PLAY AREA — puidust raam + kalev
+   ============================================================ */
 
 .play-area {
     position: relative;
-    width: 90%;
-    max-width: 600px;
-    height: 500px;
-    margin: 30px auto;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 12px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    width: calc(100% - 32px);
+    max-width: 720px;
+    height: 560px;
+    margin: 18px auto 14px;
+    background:
+        var(--texture-felt-pattern),
+        var(--texture-felt);
+    background-color: var(--felt-green);
+    background-size: 18px 18px, 100% 100%;
+    border-radius: var(--radius-lg);
+    border: 14px solid;
+    border-color: var(--wood-mid);
+    border-image:
+        linear-gradient(135deg, var(--wood-light) 0%, var(--wood-dark) 50%, var(--wood-light) 100%) 1;
+    box-shadow:
+        var(--shadow-inset-felt),
+        0 0 0 2px var(--wood-edge),
+        0 12px 28px rgba(0, 0, 0, 0.55),
+        0 4px 8px rgba(0, 0, 0, 0.4);
     box-sizing: border-box;
+    overflow: hidden;
 }
 
-.corner-info {
+/* Kalevi sisemine vinjett ja peen valgustus üleval */
+.play-area::before {
+    content: '';
     position: absolute;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 16px;
-    backdrop-filter: blur(10px);
-    z-index: 5;
-    box-sizing: border-box;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(255, 230, 160, 0.07) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(0, 0, 0, 0.25) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 1;
 }
 
-.corner-info.top-left {
-    top: 10px;
-    left: 10px;
-}
+/* ============================================================
+   PLAYER SPOTS
+   ============================================================ */
 
-.corner-info.top-right {
-    top: 10px;
-    right: 10px;
-}
-
-.corner-label {
-    font-size: 15px;
-    opacity: 0.8;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    text-decoration-line: underline;
-    text-decoration-color: #45a049;
-    text-decoration-style: dotted;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 5px;
-}
-
-.corner-scores {
+.player-spot {
+    position: absolute;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 8px;
+    z-index: 2;
 }
 
-.corner-score-row {
+.player-spot.player-bottom {
+    bottom: 124px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: column-reverse;
+}
+
+.player-spot.player-top {
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.player-spot.player-left {
+    left: 14px;
+    top: 40%;
+    transform: translateY(-50%);
+}
+
+.player-spot.player-right {
+    right: 14px;
+    top: 40%;
+    transform: translateY(-50%);
+}
+
+.player-label {
+    background: var(--texture-paper);
+    background-color: var(--paper);
+    color: var(--ink);
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    border: 1px solid var(--gold-dim);
+    box-shadow: var(--shadow-paper);
     display: flex;
-    justify-content: space-between;
-    gap: 12px;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    z-index: 3;
 }
 
-.score-label {
-    font-weight: normal;
+.player-spot.active .player-label {
+    background:
+        linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 100%);
+    border-color: var(--gold-bright);
+    color: var(--ink);
+    box-shadow:
+        var(--shadow-gold-glow),
+        var(--shadow-paper);
+    animation: pulse-gold 2s ease-in-out infinite;
+}
+
+.player-spot.winner .player-label {
+    background:
+        linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 100%);
+    color: var(--ink);
+    border-color: var(--gold-bright);
+}
+
+.player-spot.winner::before {
+    content: '👑';
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 28px;
+    animation: crown-bounce 0.6s ease-out;
+    z-index: 4;
+}
+
+@keyframes pulse-gold {
+    0%, 100% {
+        box-shadow:
+            0 0 16px rgba(232, 200, 120, 0.55),
+            0 0 4px rgba(232, 200, 120, 0.8),
+            var(--shadow-paper);
+    }
+    50% {
+        box-shadow:
+            0 0 24px rgba(232, 200, 120, 0.85),
+            0 0 8px rgba(232, 200, 120, 1),
+            var(--shadow-paper);
+    }
+}
+
+@keyframes crown-bounce {
+    0% { transform: translateX(-50%) translateY(0) scale(0.5); opacity: 0; }
+    60% { transform: translateX(-50%) translateY(-8px) scale(1.15); opacity: 1; }
+    100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+
+.trump-icon {
     font-size: 16px;
+    font-weight: bold;
+    margin-left: 2px;
+    line-height: 1;
 }
 
-.score-value {
-    font-weight: bold;
-    font-size: 18px;
-    text-align: right;
+.trump-icon.trump-hearts,
+.trump-icon.trump-diamonds {
+    color: var(--red-accent);
 }
+
+.trump-icon.trump-clubs,
+.trump-icon.trump-spades {
+    color: var(--ink);
+}
+
+.player-card {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Visuaalne kaardivirn AI mängijate jaoks (PlayerSpot komponent) */
+.player-stack {
+    position: relative;
+    width: 56px;
+    height: 78px;
+    margin-top: 2px;
+}
+
+.player-stack-card {
+    position: absolute;
+    inset: 0;
+    border-radius: 5px;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            #6b2424 0px,
+            #6b2424 4px,
+            #5a1c1c 4px,
+            #5a1c1c 8px
+        ),
+        linear-gradient(135deg, #8b2a2a 0%, #5a1c1c 100%);
+    background-color: #6b2424;
+    border: 2px solid #f5e8c8;
+    box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, 0.3),
+        0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.player-stack-card:nth-child(1) {
+    transform: rotate(-3deg) translate(-2px, 2px);
+}
+
+.player-stack-card:nth-child(2) {
+    transform: rotate(2deg) translate(1px, -1px);
+}
+
+.player-stack-card:nth-child(3) {
+    transform: rotate(-1deg);
+}
+
+.player-stack-count {
+    position: absolute;
+    bottom: -8px;
+    right: -10px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--gold-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    z-index: 4;
+}
+
+.player-partner-badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gold-bright);
+    margin-top: 2px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    font-weight: 600;
+}
+
+/* ============================================================
+   STATUS BAR (trump + bid)
+   ============================================================ */
+
+.status-bar {
+    position: absolute;
+    bottom: 280px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 5px 14px;
+    background: var(--texture-paper);
+    background-color: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--gold-dim);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-paper);
+    font-family: var(--font-body);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.status-bar-item {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.status-bar-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+}
+
+.status-bar-value {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+}
+
+.status-bar-value.suit-hearts,
+.status-bar-value.suit-diamonds {
+    color: var(--red-accent);
+}
+
+.status-bar-sep {
+    color: var(--gold-dim);
+    opacity: 0.6;
+}
+
+/* ============================================================
+   OVERLAYS
+   ============================================================ */
 
 .bottom-overlay {
     position: absolute;
-    bottom: 60px;
+    bottom: 180px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
-    width: 90%;
-    max-width: 400px;
+    width: calc(100% - 24px);
+    max-width: 480px;
 }
 
 .center-overlay {
     position: absolute;
-    top: 50%;
+    top: 42%;
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 10;
-    width: 90%;
+    width: calc(100% - 32px);
     max-width: 500px;
 }
 
 .overlay-content {
-    background: rgba(0, 0, 0, 0.85);
-    padding: 15px;
-    border-radius: 12px;
+    background: var(--texture-paper);
+    background-color: var(--paper);
+    color: var(--ink);
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
     text-align: center;
-    backdrop-filter: blur(10px);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid var(--gold-dim);
+    box-shadow:
+        var(--shadow-wood-deep),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.25);
     box-sizing: border-box;
     width: 100%;
 }
 
 .overlay-content h3 {
-    margin: 0 0 15px 0;
-    font-size: 18px;
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    font-family: var(--font-display);
+    color: var(--ink);
+    letter-spacing: 0.04em;
+}
+
+.bottom-overlay .overlay-content {
+    padding: 10px 12px;
+}
+
+.bottom-overlay .overlay-content h3 {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+/* ============================================================
+   BIDDING BUTTONS — messingist plaadid
+   ============================================================ */
+
+.bid-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.bid-buttons button {
+    padding: 8px 14px;
+    background:
+        linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-dim) 100%);
+    color: var(--ink);
+    border: 1px solid var(--wood-edge);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 700;
+    min-width: 36px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+        0 2px 4px rgba(0, 0, 0, 0.4);
+    transition: transform var(--transition-quick), box-shadow var(--transition-quick);
+}
+
+.bid-buttons button:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+        0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.bid-buttons button:active {
+    transform: translateY(0);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.4),
+        0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.bid-buttons .ruutu-button {
+    background:
+        linear-gradient(180deg, #ff8888 0%, #d44 55%, #a82828 100%);
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.bid-buttons .omale-button,
+.omale-button {
+    background:
+        linear-gradient(180deg, #fff0c8 0%, var(--gold-bright) 55%, var(--gold) 100%);
+    color: var(--ink);
+    border: 1px solid var(--wood-edge);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 8px 14px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.6),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+        0 2px 6px rgba(232, 200, 120, 0.5),
+        0 0 12px rgba(232, 200, 120, 0.35);
+}
+
+.bid-buttons .pass-button,
+.bid-buttons .exchange-button {
+    background:
+        linear-gradient(180deg, #c44 0%, var(--red-accent) 55%, #5a1010 100%);
+    color: var(--paper);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.bid-buttons .exchange-button {
+    background:
+        linear-gradient(180deg, #6ba0d4 0%, #4080b8 55%, #1a5588 100%);
+    color: var(--paper);
+}
+
+/* ============================================================
+   TRUMP CHOICE BUTTONS — suured puidust plaadid
+   ============================================================ */
+
+.trump-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.trump-buttons button {
+    padding: 12px 24px;
+    background:
+        linear-gradient(180deg, var(--wood-light) 0%, var(--wood-mid) 50%, var(--wood-dark) 100%);
+    color: var(--paper);
+    border: 2px solid var(--gold-dim);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 160, 0.15),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+        0 3px 6px rgba(0, 0, 0, 0.5);
+    transition: transform var(--transition-quick), box-shadow var(--transition-quick);
+}
+
+.trump-buttons button:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 160, 0.2),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+        0 6px 10px rgba(0, 0, 0, 0.55),
+        0 0 12px rgba(232, 200, 120, 0.25);
+    border-color: var(--gold-bright);
+}
+
+/* ============================================================
+   DEAL CHOICE / PACK CHOICE
+   ============================================================ */
+
+.deal-choice-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.deal-choice-button {
+    padding: 12px 16px;
+    background:
+        linear-gradient(180deg, var(--wood-light) 0%, var(--wood-mid) 60%, var(--wood-dark) 100%);
+    color: var(--paper);
+    border: 2px solid var(--gold-dim);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-family: var(--font-body);
+    transition: transform var(--transition-quick), box-shadow var(--transition-quick), border-color var(--transition-quick);
+    text-align: left;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 160, 0.15),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+        0 3px 6px rgba(0, 0, 0, 0.45);
+}
+
+.deal-choice-button:hover {
+    transform: translateY(-2px);
+    border-color: var(--gold-bright);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 220, 160, 0.2),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+        0 6px 10px rgba(0, 0, 0, 0.55),
+        0 0 12px rgba(232, 200, 120, 0.25);
+}
+
+.deal-choice-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 4px;
+    color: var(--gold-bright);
+    letter-spacing: 0.04em;
+}
+
+.deal-choice-desc {
+    font-size: 12px;
+    color: var(--paper);
+    opacity: 0.85;
+}
+
+.pack-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pack-choice {
+    padding: 10px;
+    background:
+        linear-gradient(180deg, rgba(20, 70, 45, 0.5) 0%, rgba(10, 40, 25, 0.6) 100%);
+    border: 2px solid var(--gold-dim);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform var(--transition-quick), border-color var(--transition-quick), box-shadow var(--transition-quick);
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4);
+}
+
+.pack-choice:hover {
+    transform: translateY(-3px);
+    border-color: var(--gold-bright);
+    box-shadow:
+        inset 0 0 8px rgba(0, 0, 0, 0.4),
+        0 6px 12px rgba(0, 0, 0, 0.5);
+}
+
+.pack-cards {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+}
+
+/* ============================================================
+   PICTURE EXCHANGE
+   ============================================================ */
+
+.exchange-overlay .overlay-content {
+    padding: 14px 16px;
 }
 
 .exchange-picture-preview {
     display: flex;
     justify-content: center;
-    margin: 10px 0;
+    margin: 8px 0;
 }
 
 .exchange-picture-preview .card {
@@ -285,303 +781,286 @@
 }
 
 .exchange-overlay .overlay-content p {
-    margin: 10px 0 0 0;
-    font-size: 14px;
+    margin: 8px 0 0 0;
+    font-size: 13px;
     opacity: 0.9;
 }
 
+/* ============================================================
+   ROUND END
+   ============================================================ */
+
+.round-end-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
 .next-round-button {
-    padding: 12px 10px;
-    background: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 8px;
+    padding: 11px 22px;
+    background:
+        linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-dim) 100%);
+    color: var(--ink);
+    border: 1px solid var(--wood-edge);
+    border-radius: var(--radius-md);
     cursor: pointer;
-    font-size: 18px;
-    font-weight: bold;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    transition: all 0.2s ease;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+        0 3px 8px rgba(0, 0, 0, 0.5);
+    transition: transform var(--transition-quick), box-shadow var(--transition-quick);
     display: block;
     margin: 0 auto;
 }
 
 .next-round-button:hover {
-    background: #45a049;
-    transform: scale(1.05);
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.6),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+        0 6px 12px rgba(0, 0, 0, 0.55),
+        0 0 18px rgba(232, 200, 120, 0.4);
 }
 
-.deal-choice-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-top: 10px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.deal-choice-button {
-    padding: 15px 20px;
-    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: all 0.2s ease;
-    text-align: left;
-}
-
-.deal-choice-button:hover {
-    background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
-    transform: scale(1.02);
-}
-
-.deal-choice-title {
-    font-weight: bold;
-    font-size: 18px;
-    margin-bottom: 5px;
-}
-
-.deal-choice-desc {
-    font-size: 13px;
-    opacity: 0.9;
-}
-
-.pack-choice-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-    margin-top: 15px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.pack-choice {
-    padding: 15px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.pack-choice:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: scale(1.05);
-}
-
-.pack-cards {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    align-items: center;
-}
-
-.player-spot {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-}
-
-.player-spot.active .player-label {
-    background: #4CAF50;
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-.player-spot.winner .player-label {
-    background: #FFD700;
-    color: #000;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.7;
-    }
-}
-
-.player-label {
-    background: rgba(255, 255, 255, 0.2);
-    padding: 6px 12px;
-    border-radius: 15px;
-    font-weight: bold;
-    font-size: 14px;
-    white-space: nowrap;
-    backdrop-filter: blur(10px);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.trump-icon {
-    font-size: 20px;
-    font-weight: bold;
-    margin-left: 4px;
-}
-
-.trump-icon.trump-hearts {
-    color: #ff4444;
-}
-
-.trump-icon.trump-diamonds {
-    color: #ff4444;
-}
-
-.trump-icon.trump-clubs {
-    color: #000;
-    text-shadow: 0 0 2px #fff;
-}
-
-.trump-icon.trump-spades {
-    color: #000;
-    text-shadow: 0 0 2px #fff;
-}
-
-.player-card {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.player-spot.player-bottom {
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.player-spot.player-top {
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.player-spot.player-left {
-    left: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.player-spot.player-right {
-    right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-}
+/* ============================================================
+   HAND ON TABLE — käsi laua serval
+   ============================================================ */
 
 .player-hand-container {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
     display: flex;
     justify-content: center;
-    margin: 30px auto;
-    max-width: 1200px;
+    width: 100%;
+    pointer-events: none;
 }
+
+.player-hand-container > * {
+    pointer-events: auto;
+}
+
+/* ============================================================
+   GAME END
+   ============================================================ */
 
 .game-end {
-    background: rgba(76, 175, 80, 0.9);
-    padding: 30px;
-    border-radius: 8px;
-    margin: 20px auto;
-    max-width: 400px;
+    background: var(--texture-paper);
+    background-color: var(--paper);
+    color: var(--ink);
+    padding: 24px 28px;
+    border-radius: var(--radius-lg);
+    margin: 24px auto;
+    max-width: 440px;
     text-align: center;
-    backdrop-filter: blur(10px);
+    border: 3px solid var(--gold);
+    box-shadow:
+        var(--shadow-wood-deep),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.3);
 }
 
-.game-end h2 {
-    margin-top: 0;
+.game-end h3 {
+    font-family: var(--font-display);
+    font-size: 28px;
+    color: var(--ink);
+    margin: 0 0 12px 0;
+    letter-spacing: 0.05em;
 }
 
-.game-end button {
-    padding: 15px 30px;
-    background: white;
-    color: #4CAF50;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    margin-top: 20px;
-}
-
-.game-end button:hover {
-    background: #f0f0f0;
+.game-end .match-wins {
+    font-size: 18px;
+    color: var(--ink-soft);
+    margin-top: 14px;
 }
 
 .final-score {
-    font-size: 24px;
-    font-weight: bold;
-    margin: 15px 0;
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 12px 0;
 }
 
-/* Mobile responsive */
+.game-end .new-match-button,
+.game-end button {
+    padding: 12px 26px;
+    background:
+        linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-dim) 100%);
+    color: var(--ink);
+    border: 1px solid var(--wood-edge);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-top: 18px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+        0 3px 8px rgba(0, 0, 0, 0.4);
+    transition: transform var(--transition-quick), box-shadow var(--transition-quick);
+}
+
+.game-end button:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+        0 6px 14px rgba(0, 0, 0, 0.5),
+        0 0 18px rgba(232, 200, 120, 0.4);
+}
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
 @media (max-width: 768px) {
-    .game-board {
-        padding: 2px;
+    .app-header {
+        grid-template-columns: auto 1fr auto;
+        gap: 8px;
+        padding: 5px 10px;
+        min-height: 40px;
     }
 
-    .corner-info {
-        font-size: 11px;
-        padding: 4px 5px;
-        max-width: 42%;
+    .app-title {
+        font-size: 18px;
     }
 
-    .corner-info.top-left {
-        left: 5px;
-    }
-
-    .corner-info.top-right {
-        right: 5px;
-    }
-
-    .corner-label {
-        font-size: 9px;
-    }
-
-    .score-label {
-        font-size: 11px;
-    }
-
-    .score-value {
-        font-size: 12px;
-    }
-
-    .corner-score-row {
+    .header-scores {
         gap: 6px;
+    }
+
+    .header-score-block {
+        padding: 2px 7px;
+    }
+
+    .header-score-label {
+        font-size: 8px;
+    }
+
+    .header-score-team {
+        font-size: 10px;
+    }
+
+    .header-score-value {
+        font-size: 13px;
+    }
+
+    .header-score-mini {
+        font-size: 10px;
+    }
+
+    .settings-button {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
     }
 
     .play-area {
         width: calc(100% - 10px);
-        max-width: 400px;
-        height: 400px;
-        margin: 5px auto;
+        max-width: 440px;
+        height: 480px;
+        margin: 10px auto;
+        border-width: 8px;
+    }
+
+    .player-spot.player-bottom {
+        bottom: 100px;
+    }
+
+    .player-spot.player-top {
+        top: 6px;
+    }
+
+    .player-spot.player-left {
+        left: 8px;
+    }
+
+    .player-spot.player-right {
+        right: 8px;
     }
 
     .player-label {
-        font-size: 12px;
-        padding: 4px 8px;
+        font-size: 11px;
+        padding: 3px 9px;
     }
 
-    .player-hand-container {
-        margin: 10px auto;
+    .player-stack {
+        width: 44px;
+        height: 62px;
+    }
+
+    .player-stack-count {
+        width: 18px;
+        height: 18px;
+        font-size: 11px;
+        bottom: -6px;
+        right: -8px;
+    }
+
+    .status-bar {
+        bottom: 230px;
+        font-size: 11px;
+        padding: 4px 10px;
+        gap: 8px;
+    }
+
+    .status-bar-label {
+        font-size: 9px;
+    }
+
+    .status-bar-value {
+        font-size: 12px;
+    }
+
+    .bottom-overlay {
+        bottom: 150px;
+        width: calc(100% - 14px);
     }
 
     .center-overlay {
-        width: 95%;
-        max-width: none;
+        width: calc(100% - 16px);
+        top: 38%;
     }
 
     .overlay-content {
-        padding: 7px 7px;
+        padding: 9px 10px;
+    }
+
+    .overlay-content h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+
+    .bid-buttons {
+        gap: 4px;
+    }
+
+    .bid-buttons button {
+        padding: 6px 10px;
+        font-size: 13px;
+        min-width: 28px;
+    }
+
+    .trump-buttons button {
+        padding: 9px 16px;
+        font-size: 13px;
     }
 
     .pack-choice-grid {
-        gap: 7px;
+        gap: 6px;
     }
 
     .pack-choice {
-        padding: 5px;
+        padding: 6px;
     }
 
     .pack-cards {
@@ -589,28 +1068,37 @@
     }
 
     .deal-choice-button {
-        padding: 12px 15px;
+        padding: 10px 12px;
     }
 
     .deal-choice-title {
-        font-size: 16px;
-    }
-
-    .deal-choice-desc {
-        font-size: 12px;
-    }
-
-    .bid-buttons button,
-    .trump-buttons button {
-        padding: 10px 12px;
         font-size: 14px;
     }
 
-    .current-trick h3 {
-        font-size: 16px;
+    .deal-choice-desc {
+        font-size: 11px;
     }
 
-    .trick-cards {
-        gap: 10px;
+    .game-end {
+        padding: 18px 16px;
+        margin: 14px auto;
+    }
+
+    .game-end h3 {
+        font-size: 22px;
+    }
+}
+
+@media (max-width: 420px) {
+    .app-title {
+        display: none;
+    }
+
+    .app-header {
+        grid-template-columns: 1fr auto;
+    }
+
+    .header-scores {
+        justify-self: start;
     }
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Hand from './Hand';
 import Card from './Card';
+import PlayerSpot from './PlayerSpot';
 import {
   createInitialState,
   GAME_PHASES,
@@ -29,7 +30,8 @@ const PLAYER_NAMES = [et.players.you, et.players.player2, et.players.partner, et
 
 const STORAGE_KEY = 'sasku-game-state';
 
-export default function GameBoard() {
+export default function GameBoard({ onNewGame }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [gameState, setGameState] = useState(() => {
     // Try to load saved game state from localStorage
     try {
@@ -514,7 +516,6 @@ export default function GameBoard() {
   const getPlayerStatus = (playerIndex) => {
     const parts = [];
 
-    // Show bid or pass during bidding
     if (gameState.phase === GAME_PHASES.BIDDING) {
       if (gameState.hasPassed[playerIndex]) {
         parts.push(et.bidding.pass);
@@ -561,52 +562,21 @@ export default function GameBoard() {
     if (!shouldShow) return null;
 
     const positions = [
-      { index: 0, className: 'player-bottom', name: PLAYER_NAMES[0] },
-      { index: 1, className: 'player-left', name: PLAYER_NAMES[1] },
-      { index: 2, className: 'player-top', name: PLAYER_NAMES[2] },
-      { index: 3, className: 'player-right', name: PLAYER_NAMES[3] }
+      { index: 0, position: 'bottom', name: PLAYER_NAMES[0] },
+      { index: 1, position: 'left', name: PLAYER_NAMES[1] },
+      { index: 2, position: 'top', name: PLAYER_NAMES[2] },
+      { index: 3, position: 'right', name: PLAYER_NAMES[3] }
     ];
+
+    const humanPartner = getPartner(0);
 
     // Check if we're showing last trick
     const showingLastTrick = (gameState.lastTrick && gameState.currentTrick.length === 0) ||
                              gameState.phase === GAME_PHASES.ROUND_END;
     const trickWinner = showingLastTrick ? gameState.lastTrick.winner : null;
 
-    // Calculate trick points for display
-    const currentPoints = calculateCurrentTrickPoints();
-
     return (
       <div className="play-area">
-        {/* Top-left: Trick points */}
-        <div className="corner-info top-left">
-          <div className="corner-label">{et.scoring.trickPoints}</div>
-          <div className="corner-scores">
-            <div className="corner-score-row">
-              <span className="score-label">{et.scoring.ourTeam}:</span>
-              <span className="score-value">{currentPoints[0]}</span>
-            </div>
-            <div className="corner-score-row">
-              <span className="score-label">{et.scoring.theirTeam}:</span>
-              <span className="score-value">{currentPoints[1]}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Top-right: Game scores */}
-        <div className="corner-info top-right">
-          <div className="corner-label">{et.scoring.gameStatus}</div>
-          <div className="corner-scores">
-            <div className="corner-score-row">
-              <span className="score-label">{et.scoring.ourTeam}:</span>
-              <span className="score-value">{gameState.gameScores[0]} | {gameState.matchWins[0]}</span>
-            </div>
-            <div className="corner-score-row">
-              <span className="score-label">{et.scoring.theirTeam}:</span>
-              <span className="score-value">{gameState.gameScores[1]} | {gameState.matchWins[1]}</span>
-            </div>
-          </div>
-        </div>
-
         {/* Bottom overlays for bidding/trump */}
         {shouldShowBiddingControls() && (
           <div className="bottom-overlay">
@@ -655,30 +625,45 @@ export default function GameBoard() {
             </div>
           </div>
         )}
-        {positions.map(({ index, className, name }) => {
+        {positions.map(({ index, position, name }) => {
           const card = getPlayerCard(index);
           const isCurrentPlayer = gameState.currentPlayer === index;
           const isWinner = showingLastTrick && index === trickWinner;
           const trumpIcon = getTrumpIcon(index);
+          const cardCount = gameState.hands[index].length;
 
           return (
-            <div key={index} className={`player-spot ${className} ${isCurrentPlayer ? 'active' : ''} ${isWinner ? 'winner' : ''}`}>
-              <div className="player-label">
-                {name}{getPlayerStatus(index)}
-                {trumpIcon && (
-                  <span className={`trump-icon trump-${gameState.trumpSuit}`}>
-                    {trumpIcon}
-                  </span>
-                )}
-              </div>
-              {card && (
-                <div className="player-card">
-                  <Card card={card} trumpSuit={gameState.trumpSuit} />
-                </div>
-              )}
-            </div>
+            <PlayerSpot
+              key={index}
+              position={position}
+              name={name}
+              cardCount={cardCount}
+              playedCard={card}
+              isCurrentPlayer={isCurrentPlayer}
+              isWinner={isWinner}
+              isPartner={index === humanPartner}
+              trumpSuit={gameState.trumpSuit}
+              trumpIcon={trumpIcon}
+              isHuman={index === 0}
+              bidStatus={getPlayerStatus(index)}
+            />
           );
         })}
+
+        {/* Hand integrated into table bottom edge */}
+        <div className="player-hand-container">
+          <Hand
+            cards={gameState.hands[0]}
+            onCardClick={handleCardPlay}
+            canPlay={gameState.phase === GAME_PHASES.PLAYING}
+            isCurrentPlayer={gameState.currentPlayer === 0}
+            hidden={false}
+            trumpSuit={gameState.trumpSuit}
+            canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
+            isBidding={gameState.phase === GAME_PHASES.BIDDING}
+            isExchanging={!!gameState.pendingPictureExchange}
+          />
+        </div>
       </div>
     );
   };
@@ -793,27 +778,69 @@ export default function GameBoard() {
     );
   };
 
+  const currentTrickPoints = calculateCurrentTrickPoints();
+  const showTrickPoints = gameState.phase === GAME_PHASES.PLAYING ||
+                          gameState.phase === GAME_PHASES.ROUND_END;
+
   return (
     <div className="game-board">
+      <header className="app-header">
+        <h1 className="app-title">{et.meta.title}</h1>
+        <div className="header-scores">
+          {showTrickPoints && (
+            <div className="header-score-block trick-points">
+              <span className="header-score-label">{et.scoring.trickPoints}</span>
+              <span className="header-score-pair">
+                <span className="header-score-team">{et.scoring.ourTeam}</span>
+                <span className="header-score-value">{currentTrickPoints[0]}</span>
+                <span className="header-score-sep">·</span>
+                <span className="header-score-team">{et.scoring.theirTeam}</span>
+                <span className="header-score-value">{currentTrickPoints[1]}</span>
+              </span>
+            </div>
+          )}
+          <div className="header-score-block match-status">
+            <span className="header-score-label">{et.scoring.gameStatus}</span>
+            <span className="header-score-pair">
+              <span className="header-score-team">{et.scoring.ourTeam}</span>
+              <span className="header-score-value">
+                {gameState.gameScores[0]}<span className="header-score-mini">|{gameState.matchWins[0]}</span>
+              </span>
+              <span className="header-score-sep">·</span>
+              <span className="header-score-team">{et.scoring.theirTeam}</span>
+              <span className="header-score-value">
+                {gameState.gameScores[1]}<span className="header-score-mini">|{gameState.matchWins[1]}</span>
+              </span>
+            </span>
+          </div>
+        </div>
+        <div className="header-menu">
+          <button
+            className="settings-button"
+            aria-label="Menüü"
+            onClick={() => setMenuOpen(o => !o)}
+          >
+            ⚙
+          </button>
+          {menuOpen && (
+            <div className="settings-dropdown">
+              <button
+                className="settings-item"
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (onNewGame) onNewGame();
+                }}
+              >
+                {et.gameEnd.newGame}
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
       {renderGameEnd()}
       {renderDealChoice()}
       {renderPackChoice()}
       {renderPlayArea()}
-
-      {/* Player's hand */}
-      <div className="player-hand-container">
-        <Hand
-          cards={gameState.hands[0]}
-          onCardClick={handleCardPlay}
-          canPlay={gameState.phase === GAME_PHASES.PLAYING}
-          isCurrentPlayer={gameState.currentPlayer === 0}
-          hidden={false}
-          trumpSuit={gameState.trumpSuit}
-          canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
-          isBidding={gameState.phase === GAME_PHASES.BIDDING}
-          isExchanging={!!gameState.pendingPictureExchange}
-        />
-      </div>
     </div>
   );
 }
