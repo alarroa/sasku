@@ -5,6 +5,7 @@
 .game-board {
     width: 100%;
     min-height: 100vh;
+    height: 100vh;
     background: var(--texture-wood);
     background-color: var(--wood-dark);
     color: var(--paper);
@@ -12,7 +13,7 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    padding-bottom: 12px;
+    overflow: hidden;
 }
 
 /* ============================================================
@@ -196,37 +197,36 @@
 
 .play-area {
     position: relative;
+    flex: 1;
     width: calc(100% - 32px);
     max-width: 720px;
-    height: 560px;
-    margin: 18px auto 14px;
-    background:
-        var(--texture-felt-pattern),
-        var(--texture-felt);
-    background-color: var(--felt-green);
-    background-size: 18px 18px, 100% 100%;
+    min-height: 480px;
+    margin: 14px auto;
+    background: var(--texture-table-wood);
+    background-color: #2e1e10;
     border-radius: var(--radius-lg);
-    border: 14px solid;
+    border: 12px solid;
     border-color: var(--wood-mid);
     border-image:
         linear-gradient(135deg, var(--wood-light) 0%, var(--wood-dark) 50%, var(--wood-light) 100%) 1;
     box-shadow:
-        var(--shadow-inset-felt),
+        inset 0 0 80px rgba(0, 0, 0, 0.55),
+        inset 0 0 14px rgba(0, 0, 0, 0.4),
         0 0 0 2px var(--wood-edge),
-        0 12px 28px rgba(0, 0, 0, 0.55),
-        0 4px 8px rgba(0, 0, 0, 0.4);
+        0 12px 28px rgba(0, 0, 0, 0.6),
+        0 4px 8px rgba(0, 0, 0, 0.45);
     box-sizing: border-box;
     overflow: hidden;
 }
 
-/* Kalevi sisemine vinjett ja peen valgustus üleval */
+/* Sisemine vinjett — pisut valgustust ülemise ääre lähedalt, varjud servades */
 .play-area::before {
     content: '';
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(ellipse at 50% 0%, rgba(255, 230, 160, 0.07) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 100%, rgba(0, 0, 0, 0.25) 0%, transparent 60%);
+        radial-gradient(ellipse at 50% 0%, rgba(255, 220, 160, 0.05) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 100%, rgba(0, 0, 0, 0.35) 0%, transparent 65%);
     pointer-events: none;
     z-index: 1;
 }
@@ -245,7 +245,7 @@
 }
 
 .player-spot.player-bottom {
-    bottom: 124px;
+    bottom: 150px;
     left: 50%;
     transform: translateX(-50%);
     flex-direction: column-reverse;
@@ -304,17 +304,9 @@
         linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 100%);
     color: var(--ink);
     border-color: var(--gold-bright);
-}
-
-.player-spot.winner::before {
-    content: '👑';
-    position: absolute;
-    top: -22px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 28px;
-    animation: crown-bounce 0.6s ease-out;
-    z-index: 4;
+    box-shadow:
+        0 0 14px rgba(232, 200, 120, 0.6),
+        var(--shadow-paper);
 }
 
 @keyframes pulse-gold {
@@ -330,12 +322,6 @@
             0 0 8px rgba(232, 200, 120, 1),
             var(--shadow-paper);
     }
-}
-
-@keyframes crown-bounce {
-    0% { transform: translateX(-50%) translateY(0) scale(0.5); opacity: 0; }
-    60% { transform: translateX(-50%) translateY(-8px) scale(1.15); opacity: 1; }
-    100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
 }
 
 .trump-icon {
@@ -493,7 +479,7 @@
 
 .bottom-overlay {
     position: absolute;
-    bottom: 180px;
+    bottom: 220px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
@@ -833,7 +819,7 @@
 
 .player-hand-container {
     position: absolute;
-    bottom: 6px;
+    bottom: 22px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 5;
@@ -967,13 +953,13 @@
     .play-area {
         width: calc(100% - 10px);
         max-width: 440px;
-        height: 480px;
-        margin: 10px auto;
+        min-height: 420px;
+        margin: 8px auto;
         border-width: 8px;
     }
 
     .player-spot.player-bottom {
-        bottom: 100px;
+        bottom: 120px;
     }
 
     .player-spot.player-top {
@@ -1022,7 +1008,7 @@
     }
 
     .bottom-overlay {
-        bottom: 150px;
+        bottom: 180px;
         width: calc(100% - 14px);
     }
 
