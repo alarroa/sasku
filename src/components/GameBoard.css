@@ -272,6 +272,24 @@
     font-size: 18px;
 }
 
+.exchange-picture-preview {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+}
+
+.exchange-picture-preview .card {
+    width: 80px;
+    height: 112px;
+    pointer-events: none;
+}
+
+.exchange-overlay .overlay-content p {
+    margin: 10px 0 0 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
 .next-round-button {
     padding: 12px 10px;
     background: #4CAF50;

@@ -42,6 +42,8 @@ export const et = {
     ruutuButton: 'Ruutu',
     exchangePicture: 'Anna pilti',
     selectCardToReceive: 'Vali kaart, mida soovid saada:',
+    partnerOffersPicture: 'Paariline annab sulle pildi',
+    selectCardToGive: 'Vali kaart, mida talle vastu annad',
   },
 
   // Scoring

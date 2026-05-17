@@ -48,6 +48,9 @@ export default function GameBoard() {
         if (!loadedState.hasExchangedPicture) {
           loadedState.hasExchangedPicture = [false, false, false, false];
         }
+        if (loadedState.pendingPictureExchange === undefined) {
+          loadedState.pendingPictureExchange = null;
+        }
         return loadedState;
       }
     } catch (error) {
@@ -116,6 +119,9 @@ export default function GameBoard() {
   useEffect(() => {
     if (gameState.currentPlayer === 0) return; // Human player
 
+    // Pause AI while waiting for the human to choose a card to give back in a picture exchange
+    if (gameState.pendingPictureExchange) return;
+
     console.log(`AI turn: Player ${gameState.currentPlayer}, Phase: ${gameState.phase}`);
 
     // If trick just completed (4 cards), wait longer to show the result
@@ -158,6 +164,17 @@ export default function GameBoard() {
           // AI exchanges picture 70% of the time if possible
           const pictureCard = gameState.hands[playerIndex].find(c => c.isPicture);
           const partnerIndex = getPartner(playerIndex);
+
+          // If partner is the human, let them choose which card to give back
+          if (partnerIndex === 0 && pictureCard) {
+            console.log(`AI ${playerIndex} initiates picture exchange with human (${pictureCard.rank})`);
+            setGameState({
+              ...gameState,
+              pendingPictureExchange: { fromPlayer: playerIndex, pictureCard }
+            });
+            return;
+          }
+
           const partnerHand = gameState.hands[partnerIndex];
 
           // Choose which card to give (same logic as human player's partner)
@@ -252,6 +269,15 @@ export default function GameBoard() {
   };
 
   const handleCardPlay = (card) => {
+    // If partner is offering a picture, this click selects which card to give back
+    if (gameState.pendingPictureExchange) {
+      if (card.isPicture) return;
+      const { fromPlayer, pictureCard } = gameState.pendingPictureExchange;
+      const newState = exchangePicture(gameState, fromPlayer, pictureCard, card);
+      setGameState(newState);
+      return;
+    }
+
     if (!canPlayCard(gameState, 0, card)) {
       return;
     }
@@ -598,6 +624,19 @@ export default function GameBoard() {
           </div>
         )}
 
+        {/* Picture exchange offered by AI partner — human chooses card to give back */}
+        {gameState.pendingPictureExchange && (
+          <div className="center-overlay exchange-overlay">
+            <div className="overlay-content">
+              <h3>{et.bidding.partnerOffersPicture}</h3>
+              <div className="exchange-picture-preview">
+                <Card card={gameState.pendingPictureExchange.pictureCard} trumpSuit={gameState.trumpSuit} />
+              </div>
+              <p>{et.bidding.selectCardToGive}</p>
+            </div>
+          </div>
+        )}
+
         {/* Center overlay for round end */}
         {gameState.phase === GAME_PHASES.ROUND_END && (
           <div className="center-overlay">
@@ -772,6 +811,7 @@ export default function GameBoard() {
           trumpSuit={gameState.trumpSuit}
           canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
           isBidding={gameState.phase === GAME_PHASES.BIDDING}
+          isExchanging={!!gameState.pendingPictureExchange}
         />
       </div>
     </div>

@@ -2,7 +2,7 @@ import Card from './Card';
 import { sortHand } from '../game/cards';
 import './Hand.css';
 
-export default function Hand({ cards, onCardClick, canPlay, isCurrentPlayer, hidden, trumpSuit, canPlayCardFn, isBidding }) {
+export default function Hand({ cards, onCardClick, canPlay, isCurrentPlayer, hidden, trumpSuit, canPlayCardFn, isBidding, isExchanging }) {
   const sortedCards = sortHand(cards, trumpSuit);
 
   return (
@@ -20,8 +20,13 @@ export default function Hand({ cards, onCardClick, canPlay, isCurrentPlayer, hid
             // Check if this specific card can be played
             const cardCanBePlayed = canPlay && isCurrentPlayer && canPlayCardFn && canPlayCardFn(card);
 
-            // During bidding, cards should be disabled (cannot be played)
-            const isDisabled = isBidding ? true : !cardCanBePlayed;
+            // During exchange selection: non-picture cards are clickable, pictures disabled
+            // During bidding: cards are disabled
+            const isDisabled = isExchanging
+              ? card.isPicture
+              : isBidding
+                ? true
+                : !cardCanBePlayed;
 
             return (
               <Card
@@ -29,7 +34,7 @@ export default function Hand({ cards, onCardClick, canPlay, isCurrentPlayer, hid
                 card={card}
                 onClick={onCardClick}
                 disabled={isDisabled}
-                active={isBidding}
+                active={isBidding || isExchanging}
                 trumpSuit={trumpSuit}
               />
             );

@@ -46,6 +46,9 @@ export function createInitialState() {
     gameScores: [0, 0],
     matchWins: [0, 0], // Track match wins across multiple games
 
+    // Pending picture exchange initiated by AI partner, awaiting human's choice of card to give back
+    pendingPictureExchange: null,
+
     // History
     lastTrick: null
   };
@@ -247,6 +250,9 @@ export function exchangePicture(state, playerIndex, pictureCard, partnerCard) {
   newState.hasExchangedPicture = [...state.hasExchangedPicture];
   newState.hasExchangedPicture[playerIndex] = true;
   newState.hasExchangedPicture[partnerIndex] = true; // Partner also can't exchange now
+
+  // Clear any pending exchange request
+  newState.pendingPictureExchange = null;
 
   return newState;
 }
