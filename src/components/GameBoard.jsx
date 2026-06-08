@@ -150,7 +150,7 @@ export default function GameBoard({
     }
 
     return (
-      <div className="center-overlay">
+      <div className="center-overlay deal-choice-overlay">
         <div className="overlay-content">
           <h3>{et.dealChoice.title}</h3>
           <div className="deal-choice-buttons">
@@ -178,7 +178,7 @@ export default function GameBoard({
     }
 
     return (
-      <div className="center-overlay">
+      <div className="center-overlay deal-choice-overlay">
         <div className="overlay-content">
           <h3>{et.dealChoice.choosePack}</h3>
           <div className="pack-choice-grid">

@@ -588,6 +588,13 @@
     max-width: 500px;
 }
 
+/* Deal/pack choice show at game start with no hand on the table, so they can
+   sit lower — clear of the room-code banner up top. Combined-class selector
+   keeps this winning over the mobile `.center-overlay` override below. */
+.center-overlay.deal-choice-overlay {
+    top: 52%;
+}
+
 .overlay-content {
     background: var(--texture-paper);
     background-color: var(--paper);
@@ -1185,6 +1192,10 @@
    ============================================================ */
 
 .room-banner {
+    position: relative;
+    /* Stay above the centered deal/pack overlay (z-index 10) so the room code
+       is never hidden on short mobile viewports. */
+    z-index: 15;
     display: flex;
     align-items: center;
     gap: 10px;
