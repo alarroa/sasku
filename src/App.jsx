@@ -1,33 +1,52 @@
-import { useState } from 'react'
 import GameBoard from './components/GameBoard'
+import Lobby from './components/Lobby'
+import { usePeerGame } from './net/usePeerGame'
 import { et } from './i18n/et'
 import './App.css'
 
-const STORAGE_KEY = 'sasku-game-state'
-
 function App() {
-  const [resetKey, setResetKey] = useState(0)
+  const game = usePeerGame()
 
-  const handleNewGame = () => {
-    // Clear localStorage
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch (error) {
-      console.error('Failed to clear game state:', error)
-    }
-    // Force GameBoard to remount with fresh state
-    setResetKey(prev => prev + 1)
+  const renderHeaderActions = () => {
+    if (game.mode === 'menu') return null
+
+    return (
+      <div className="header-actions">
+        {game.mode === 'single' && (
+          <button className="new-game-button" onClick={game.resetGame}>
+            {et.gameEnd.newGame}
+          </button>
+        )}
+        <button className="new-game-button" onClick={game.leaveToMenu}>
+          {et.lobby.menu}
+        </button>
+      </div>
+    )
   }
 
   return (
     <div className="app">
       <header className="app-header">
-        <button className="new-game-button" onClick={handleNewGame}>
-          {et.gameEnd.newGame}
-        </button>
+        {renderHeaderActions()}
         <h1>{et.meta.title}</h1>
       </header>
-      <GameBoard key={resetKey} />
+
+      {game.mode === 'menu' ? (
+        <Lobby
+          onSingle={game.startSingle}
+          onHost={game.createGame}
+          onJoin={game.joinGame}
+          status={game.status}
+        />
+      ) : (
+        <GameBoard
+          gameState={game.gameState}
+          mySeat={game.mySeat}
+          dispatch={game.dispatch}
+          roomCode={game.mode === 'host' ? game.roomCode : null}
+          connectedSeats={game.connectedSeats}
+        />
+      )}
     </div>
   )
 }

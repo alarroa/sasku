@@ -8,6 +8,73 @@
     box-sizing: border-box;
 }
 
+.room-banner {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    z-index: 50;
+    backdrop-filter: blur(8px);
+}
+
+.room-code-label {
+    opacity: 0.8;
+}
+
+.room-code-value {
+    font-weight: bold;
+    letter-spacing: 0.15em;
+    font-size: 16px;
+    color: #ffd54f;
+}
+
+.room-players {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.room-seat {
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+}
+
+.room-seat.filled {
+    background: rgba(46, 125, 50, 0.5);
+}
+
+.room-seat.ai {
+    opacity: 0.6;
+}
+
+.winner-line {
+    font-size: 16px;
+    margin: 8px 0 16px;
+}
+
+@media (max-width: 768px) {
+    .room-banner {
+        font-size: 11px;
+        gap: 6px;
+        padding: 4px 8px;
+    }
+    .room-code-value {
+        font-size: 14px;
+    }
+}
+
 .current-trick {
     background: rgba(255, 255, 255, 0.1);
     padding: 20px;

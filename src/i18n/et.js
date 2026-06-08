@@ -63,5 +63,26 @@ export const et = {
     newMatch: 'Uus partii',
     newGame: 'Uus mäng',
     matchWins: 'Partiid'
+  },
+
+  // Multiplayer lobby
+  lobby: {
+    single: 'Üksikmäng',
+    host: 'Loo võrgumäng',
+    join: 'Liitu mänguga',
+    enterCode: 'Sisesta ruumikood',
+    connect: 'Ühenda',
+    back: 'Tagasi',
+    menu: 'Menüü',
+    roomCode: 'Ruumikood',
+    connecting: 'Ühendan...',
+    connectionError: 'Ühendus ebaõnnestus',
+    notFound: 'Sellist ruumi ei leitud',
+    roomFull: 'Ruum on täis',
+    disconnected: 'Ühendus katkes',
+    seatPartner: 'Paariline',
+    seatOpponent: 'Vastane',
+    empty: 'AI',
+    hint: 'Loo võrgumäng ja jaga ruumikoodi kaasmängijatega. Esimene liituja on sinu paariline, järgmised vastasmängijad. Tühjad kohad mängib AI.'
   }
 };

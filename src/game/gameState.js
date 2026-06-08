@@ -222,6 +222,23 @@ export function passBid(state, playerIndex) {
   return newState;
 }
 
+// Quick "Ruutu" bid: bid the minimum and immediately set diamonds as trump
+export function quickRuutuBid(state, playerIndex) {
+  const currentHighBid = Math.max(0, ...state.bids.filter(b => b !== null));
+  const newBid = Math.max(5, currentHighBid + 1);
+
+  const newState = { ...state };
+  newState.bids = [...state.bids];
+  newState.bids[playerIndex] = newBid;
+  newState.trumpMaker = playerIndex;
+  newState.trumpSuit = SUITS.DIAMONDS;
+  newState.phase = GAME_PHASES.PLAYING;
+  newState.leadPlayer = getNextPlayer(newState.dealer);
+  newState.currentPlayer = newState.leadPlayer;
+
+  return newState;
+}
+
 export function chooseTrump(state, suit) {
   const newState = { ...state };
   newState.trumpSuit = suit;

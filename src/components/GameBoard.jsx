@@ -1,187 +1,63 @@
-import { useState, useEffect } from 'react';
 import Hand from './Hand';
 import Card from './Card';
 import {
-  createInitialState,
   GAME_PHASES,
   DEAL_OPTIONS,
   canPlayCard,
-  playCard,
-  makeBid,
-  passBid,
-  chooseTrump,
-  chooseDealOption,
-  chooseCardPack,
-  startNewRound,
-  startNewMatch,
-  getTeam,
-  getNextPlayer
+  getTeam
 } from '../game/gameState';
-import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
 import { SUITS, SUIT_NAMES_ET, SUIT_SYMBOLS, calculateBiddingValue } from '../game/cards';
 import { et } from '../i18n/et';
 import './GameBoard.css';
 
-const PLAYER_NAMES = [et.players.you, et.players.player2, et.players.partner, et.players.player4];
+// Names indexed by position RELATIVE to the viewer:
+// 0 = you (bottom), 1 = left opponent, 2 = partner (top), 3 = right opponent
+const RELATIVE_NAMES = [et.players.you, et.players.player2, et.players.partner, et.players.player4];
+const RELATIVE_CLASS = ['player-bottom', 'player-left', 'player-top', 'player-right'];
 
-const STORAGE_KEY = 'sasku-game-state';
+export default function GameBoard({
+  gameState,
+  mySeat = 0,
+  dispatch,
+  roomCode = null,
+  connectedSeats = []
+}) {
+  if (!gameState) return null;
 
-export default function GameBoard() {
-  const [gameState, setGameState] = useState(() => {
-    // Try to load saved game state from localStorage
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const loadedState = JSON.parse(saved);
-        // Ensure matchWins exists (for backwards compatibility)
-        if (!loadedState.matchWins) {
-          loadedState.matchWins = [0, 0];
-        }
-        // Ensure pokkBonus exists (for backwards compatibility)
-        if (loadedState.pokkBonus === undefined) {
-          loadedState.pokkBonus = false;
-        }
-        return loadedState;
-      }
-    } catch (error) {
-      console.error('Failed to load game state:', error);
-    }
-    return createInitialState();
-  });
+  const myTeam = getTeam(mySeat);
+  const oppTeam = 1 - myTeam;
 
-  // Save game state to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
-    } catch (error) {
-      console.error('Failed to save game state:', error);
-    }
-  }, [gameState]);
+  // Position of an absolute seat relative to the viewer (0 = self, clockwise)
+  const relPos = (seat) => (seat - mySeat + 4) % 4;
 
-  // Auto-pass if player has already passed during bidding
-  useEffect(() => {
-    if (gameState.phase === GAME_PHASES.BIDDING &&
-        gameState.currentPlayer === 0 &&
-        gameState.hasPassed[0]) {
-      // Player has already passed, skip their turn
-      const timer = setTimeout(() => {
-        setGameState(passBid(gameState, 0));
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [gameState]);
-
-  // AI turn handling
-  useEffect(() => {
-    if (gameState.currentPlayer === 0) return; // Human player
-
-    // If trick just completed (4 cards), wait longer to show the result
-    const trickJustCompleted = gameState.lastTrick &&
-                               gameState.lastTrick.trick.length === 4 &&
-                               gameState.currentTrick.length === 0;
-
-    const delay = trickJustCompleted ? 2500 : 600; // 2.5s for completed trick, 600ms normally
-
-    const timer = setTimeout(() => {
-      const playerIndex = gameState.currentPlayer;
-
-      if (gameState.phase === GAME_PHASES.DEAL_CHOICE) {
-        // AI always chooses "Tõstan" (normal deal)
-        setGameState(chooseDealOption(gameState, DEAL_OPTIONS.TOSTAN));
-      } else if (gameState.phase === GAME_PHASES.BIDDING) {
-        // Check if this player needs to choose trump
-        if (gameState.trumpMaker === playerIndex && !gameState.trumpSuit) {
-          const trump = chooseAITrump(gameState, playerIndex);
-          const newState = chooseTrump(gameState, trump);
-          setGameState(newState);
-        } else {
-          const bid = makeAIBid(gameState, playerIndex);
-          if (bid !== null) {
-            setGameState(makeBid(gameState, playerIndex, bid));
-          } else {
-            setGameState(passBid(gameState, playerIndex));
-          }
-        }
-      } else if (gameState.phase === GAME_PHASES.PLAYING) {
-        const card = chooseAICard(gameState, playerIndex);
-        if (card) {
-          const newState = playCard(gameState, playerIndex, card);
-          setGameState(newState);
-        }
-      }
-    }, delay);
-
-    return () => clearTimeout(timer);
-  }, [gameState]);
-
-  const handleDealChoice = (option) => {
-    setGameState(chooseDealOption(gameState, option));
-  };
-
-  const handlePackChoice = (packIndex) => {
-    setGameState(chooseCardPack(gameState, 0, packIndex));
-  };
-
-  const handleBid = (bid) => {
-    const newState = makeBid(gameState, 0, bid, false);
-    setGameState(newState);
-  };
+  const handleDealChoice = (option) => dispatch({ type: 'dealChoice', option });
+  const handlePackChoice = (packIndex) => dispatch({ type: 'packChoice', index: packIndex });
+  const handleBid = (bid) => dispatch({ type: 'bid', value: bid, omale: false });
+  const handlePass = () => dispatch({ type: 'pass' });
+  const handleRuutuBid = () => dispatch({ type: 'ruutuBid' });
+  const handleTrumpChoice = (suit) => dispatch({ type: 'trump', suit });
+  const handleNewRound = () => dispatch({ type: 'newRound' });
+  const handleNewMatch = () => dispatch({ type: 'newMatch' });
 
   const handleOmale = () => {
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
-    const newState = makeBid(gameState, 0, currentHighBid, true);
-    setGameState(newState);
-  };
-
-  const handlePass = () => {
-    const newState = passBid(gameState, 0);
-    setGameState(newState);
-  };
-
-  const handleTrumpChoice = (suit) => {
-    const newState = chooseTrump(gameState, suit);
-    setGameState(newState);
+    dispatch({ type: 'bid', value: currentHighBid, omale: true });
   };
 
   const handleCardPlay = (card) => {
-    if (!canPlayCard(gameState, 0, card)) {
-      return;
-    }
-
-    const newState = playCard(gameState, 0, card);
-    setGameState(newState);
-  };
-
-  const handleNewRound = () => {
-    setGameState(startNewRound(gameState));
-  };
-
-  const handleRuutuBid = () => {
-    // Automatically bid and choose diamonds as trump
-    // Minimum bid is 5
-    const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
-    const newBid = Math.max(5, currentHighBid + 1);
-
-    const newState = { ...gameState };
-    newState.bids = [...gameState.bids];
-    newState.bids[0] = newBid;
-    newState.trumpMaker = 0;
-    newState.trumpSuit = SUITS.DIAMONDS;
-    newState.phase = GAME_PHASES.PLAYING;
-    newState.leadPlayer = getNextPlayer(newState.dealer);
-    newState.currentPlayer = newState.leadPlayer;
-    setGameState(newState);
+    if (!canPlayCard(gameState, mySeat, card)) return;
+    dispatch({ type: 'playCard', card });
   };
 
   const shouldShowBiddingControls = () => {
     return gameState.phase === GAME_PHASES.BIDDING &&
-           gameState.currentPlayer === 0 &&
-           !gameState.hasPassed[0] &&
+           gameState.currentPlayer === mySeat &&
+           !gameState.hasPassed[mySeat] &&
            gameState.trumpMaker === null;
   };
 
   const renderDealChoice = () => {
-    if (gameState.phase !== GAME_PHASES.DEAL_CHOICE || gameState.currentPlayer !== 0) {
+    if (gameState.phase !== GAME_PHASES.DEAL_CHOICE || gameState.currentPlayer !== mySeat) {
       return null;
     }
 
@@ -209,7 +85,7 @@ export default function GameBoard() {
   };
 
   const renderPackChoice = () => {
-    if (gameState.phase !== GAME_PHASES.PACK_CHOICE || gameState.currentPlayer !== 0) {
+    if (gameState.phase !== GAME_PHASES.PACK_CHOICE || gameState.currentPlayer !== mySeat) {
       return null;
     }
 
@@ -236,7 +112,7 @@ export default function GameBoard() {
     if (!shouldShowBiddingControls()) return null;
 
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
-    const maxPossibleBid = calculateBiddingValue(gameState.hands[0]);
+    const maxPossibleBid = calculateBiddingValue(gameState.hands[mySeat]);
     const possibleBids = [];
 
     // Minimum bid is 5
@@ -250,9 +126,9 @@ export default function GameBoard() {
         .filter(b => b.bid !== null);
 
       if (bidsWithPlayers.length >= 2) {
-        // Check if player 0 made a bid before the current high bid
+        // Check if this player made a bid before the current high bid
         for (let i = bidsWithPlayers.length - 1; i >= 0; i--) {
-          if (bidsWithPlayers[i].bid < currentHighBid && bidsWithPlayers[i].player === 0) {
+          if (bidsWithPlayers[i].bid < currentHighBid && bidsWithPlayers[i].player === mySeat) {
             canOmale = true;
             break;
           }
@@ -289,7 +165,7 @@ export default function GameBoard() {
 
   const shouldShowTrumpChoice = () => {
     return !gameState.trumpSuit &&
-           gameState.trumpMaker === 0 &&
+           gameState.trumpMaker === mySeat &&
            gameState.trumpMaker !== null;
   };
 
@@ -297,8 +173,8 @@ export default function GameBoard() {
     if (!shouldShowTrumpChoice()) return null;
 
     // Calculate valid trump suits based on the bid and hand
-    const hand = gameState.hands[0];
-    const myBid = gameState.bids[0];
+    const hand = gameState.hands[mySeat];
+    const myBid = gameState.bids[mySeat];
     const pictures = hand.filter(c => c.isPicture).length;
 
     // Count cards by suit (excluding pictures)
@@ -374,6 +250,22 @@ export default function GameBoard() {
     return null;
   };
 
+  const calculateCurrentTrickPoints = () => {
+    const teamPoints = [0, 0];
+
+    // Count points from won tricks
+    gameState.tricksWon.forEach((tricks, playerIndex) => {
+      const team = getTeam(playerIndex);
+      tricks.forEach(trick => {
+        trick.forEach(play => {
+          teamPoints[team] += play.card.points;
+        });
+      });
+    });
+
+    return teamPoints;
+  };
+
   const renderPlayArea = () => {
     // Show play area during bidding, playing, and round end
     const shouldShow = gameState.phase === GAME_PHASES.BIDDING ||
@@ -382,12 +274,12 @@ export default function GameBoard() {
 
     if (!shouldShow) return null;
 
-    const positions = [
-      { index: 0, className: 'player-bottom', name: PLAYER_NAMES[0] },
-      { index: 1, className: 'player-left', name: PLAYER_NAMES[1] },
-      { index: 2, className: 'player-top', name: PLAYER_NAMES[2] },
-      { index: 3, className: 'player-right', name: PLAYER_NAMES[3] }
-    ];
+    // Players placed by position relative to the viewer (viewer always at bottom)
+    const positions = [0, 1, 2, 3].map((seat) => ({
+      index: seat,
+      className: RELATIVE_CLASS[relPos(seat)],
+      name: RELATIVE_NAMES[relPos(seat)]
+    }));
 
     // Check if we're showing last trick
     const showingLastTrick = (gameState.lastTrick && gameState.currentTrick.length === 0) ||
@@ -405,11 +297,11 @@ export default function GameBoard() {
           <div className="corner-scores">
             <div className="corner-score-row">
               <span className="score-label">{et.scoring.ourTeam}:</span>
-              <span className="score-value">{currentPoints[0]}</span>
+              <span className="score-value">{currentPoints[myTeam]}</span>
             </div>
             <div className="corner-score-row">
               <span className="score-label">{et.scoring.theirTeam}:</span>
-              <span className="score-value">{currentPoints[1]}</span>
+              <span className="score-value">{currentPoints[oppTeam]}</span>
             </div>
           </div>
         </div>
@@ -420,11 +312,11 @@ export default function GameBoard() {
           <div className="corner-scores">
             <div className="corner-score-row">
               <span className="score-label">{et.scoring.ourTeam}:</span>
-              <span className="score-value">{gameState.gameScores[0]} | {gameState.matchWins[0]}</span>
+              <span className="score-value">{gameState.gameScores[myTeam]} | {gameState.matchWins[myTeam]}</span>
             </div>
             <div className="corner-score-row">
               <span className="score-label">{et.scoring.theirTeam}:</span>
-              <span className="score-value">{gameState.gameScores[1]} | {gameState.matchWins[1]}</span>
+              <span className="score-value">{gameState.gameScores[oppTeam]} | {gameState.matchWins[oppTeam]}</span>
             </div>
           </div>
         </div>
@@ -492,109 +384,22 @@ export default function GameBoard() {
     );
   };
 
-  const calculateCurrentTrickPoints = () => {
-    const teamPoints = [0, 0];
-
-    // Count points from won tricks
-    gameState.tricksWon.forEach((tricks, playerIndex) => {
-      const team = getTeam(playerIndex);
-      tricks.forEach(trick => {
-        trick.forEach(play => {
-          teamPoints[team] += play.card.points;
-        });
-      });
-    });
-
-    return teamPoints;
-  };
-
-  const convertScoreToMarks = (score) => {
-    const marks = [];
-    let remaining = score;
-
-    while (remaining >= 4) {
-      marks.push('#');
-      remaining -= 4;
-    }
-    while (remaining >= 2) {
-      marks.push('||');
-      remaining -= 2;
-    }
-
-    return marks;
-  };
-
-  const renderScores = () => {
-    const currentPoints = calculateCurrentTrickPoints();
-    const showCurrentPoints = gameState.phase === GAME_PHASES.PLAYING && gameState.tricksWon.some(t => t.length > 0);
-
-    const ourMarks = convertScoreToMarks(gameState.gameScores[0]);
-    const theirMarks = convertScoreToMarks(gameState.gameScores[1]);
-    const maxRows = Math.max(ourMarks.length, theirMarks.length, 1);
-
-    return (
-      <div className="scores">
-        <h3>{et.scoring.gameStatus}</h3>
-        <div className="score-table">
-          <div className="score-header">
-            <div className="score-team">{et.scoring.ourTeam}</div>
-            <div className="score-team">{et.scoring.theirTeam}</div>
-          </div>
-          <div className="score-marks">
-            {Array.from({ length: maxRows }).map((_, index) => (
-              <div key={index} className="score-row-marks">
-                <div className="score-mark">{ourMarks[index] || ''}</div>
-                <div className="score-mark">{theirMarks[index] || ''}</div>
-              </div>
-            ))}
-            {maxRows === 0 && (
-              <div className="score-row-marks">
-                <div className="score-mark"></div>
-                <div className="score-mark"></div>
-              </div>
-            )}
-          </div>
-          <div className="score-totals">
-            <div className="score-total">{gameState.gameScores[0]} | {gameState.matchWins[0]}</div>
-            <div className="score-total">{gameState.gameScores[1]} | {gameState.matchWins[1]}</div>
-          </div>
-        </div>
-
-        {showCurrentPoints && (
-          <div className="current-trick-points">
-            <h4>{et.scoring.trickPoints}</h4>
-            <div className="trick-points-row">
-              <span>{et.scoring.ourTeam}:</span>
-              <span className="points-value">{currentPoints[0]}</span>
-            </div>
-            <div className="trick-points-row">
-              <span>{et.scoring.theirTeam}:</span>
-              <span className="points-value">{currentPoints[1]}</span>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const handleNewMatch = () => {
-    setGameState(startNewMatch(gameState));
-  };
-
   const renderGameEnd = () => {
     if (gameState.phase !== GAME_PHASES.GAME_END) return null;
 
-    const winner = gameState.gameScores[0] >= 16 ? et.scoring.ourTeam : et.scoring.theirTeam;
+    const weWon = gameState.gameScores[myTeam] >= 16;
+    const winner = weWon ? et.scoring.ourTeam : et.scoring.theirTeam;
 
     return (
       <div className="game-end">
         <h3>{et.gameEnd.gameOver}</h3>
         <p className="final-score">
-          {et.scoring.ourTeam}: {gameState.gameScores[0]} - {et.scoring.theirTeam}: {gameState.gameScores[1]}
+          {et.scoring.ourTeam}: {gameState.gameScores[myTeam]} - {et.scoring.theirTeam}: {gameState.gameScores[oppTeam]}
         </p>
         <h3 className="match-wins">
-          {et.gameEnd.matchWins}: {et.scoring.ourTeam} {gameState.matchWins[0]} - {et.scoring.theirTeam} {gameState.matchWins[1]}
+          {et.gameEnd.matchWins}: {et.scoring.ourTeam} {gameState.matchWins[myTeam]} - {et.scoring.theirTeam} {gameState.matchWins[oppTeam]}
         </h3>
+        <p className="winner-line">{et.gameEnd.winner.replace('{winner}', winner)}</p>
         <button onClick={handleNewMatch} className="new-match-button">
           {et.gameEnd.newMatch}
         </button>
@@ -602,8 +407,37 @@ export default function GameBoard() {
     );
   };
 
+  const renderRoomBanner = () => {
+    if (!roomCode) return null;
+
+    // Show which networked seats are filled by humans (relative labels)
+    const seatLabel = (seat) => {
+      const pos = relPos(seat);
+      if (pos === 2) return et.lobby.seatPartner;
+      return et.lobby.seatOpponent;
+    };
+
+    return (
+      <div className="room-banner">
+        <span className="room-code-label">{et.lobby.roomCode}:</span>
+        <span className="room-code-value">{roomCode}</span>
+        <span className="room-players">
+          {[2, 1, 3].map((seat) => (
+            <span
+              key={seat}
+              className={`room-seat ${connectedSeats.includes(seat) ? 'filled' : 'ai'}`}
+            >
+              {seatLabel(seat)}: {connectedSeats.includes(seat) ? '✓' : et.lobby.empty}
+            </span>
+          ))}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="game-board">
+      {renderRoomBanner()}
       {renderGameEnd()}
       {renderDealChoice()}
       {renderPackChoice()}
@@ -612,13 +446,13 @@ export default function GameBoard() {
       {/* Player's hand */}
       <div className="player-hand-container">
         <Hand
-          cards={gameState.hands[0]}
+          cards={gameState.hands[mySeat]}
           onCardClick={handleCardPlay}
           canPlay={gameState.phase === GAME_PHASES.PLAYING}
-          isCurrentPlayer={gameState.currentPlayer === 0}
+          isCurrentPlayer={gameState.currentPlayer === mySeat}
           hidden={false}
           trumpSuit={gameState.trumpSuit}
-          canPlayCardFn={(card) => canPlayCard(gameState, 0, card)}
+          canPlayCardFn={(card) => canPlayCard(gameState, mySeat, card)}
           isBidding={gameState.phase === GAME_PHASES.BIDDING}
         />
       </div>
