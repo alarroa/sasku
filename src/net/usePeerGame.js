@@ -35,11 +35,10 @@ const SEAT_ORDER = [2, 1, 3];
 // the authoritative game state.
 
 function makeRoomCode() {
-  // Avoid ambiguous characters (0/O, 1/I)
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  // 4-digit numeric code so phones show the number keypad
   let code = '';
   for (let i = 0; i < 4; i++) {
-    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+    code += Math.floor(Math.random() * 10);
   }
   return code;
 }
@@ -152,6 +151,8 @@ export function usePeerGame() {
   const [mySeat, setMySeat] = useState(0);
   const [roomCode, setRoomCode] = useState(null);
   const [connectedSeats, setConnectedSeats] = useState([]);
+  // Display name per seat (null = AI / no custom name). Joiners supply their own.
+  const [playerNames, setPlayerNames] = useState([null, null, null, null]);
   const [status, setStatus] = useState(null);
 
   const peerRef = useRef(null);
@@ -182,6 +183,14 @@ export function usePeerGame() {
       if (conn.open) conn.send({ type: 'state', gameState });
     });
   }, [gameState, mode]);
+
+  // Host: keep every client's view of the seat names in sync
+  useEffect(() => {
+    if (mode !== 'host') return;
+    connsRef.current.forEach((conn) => {
+      if (conn.open) conn.send({ type: 'names', names: playerNames });
+    });
+  }, [playerNames, mode]);
 
   // Host: drive AI for any seat that is not occupied by a human
   useEffect(() => {
@@ -325,6 +334,7 @@ export function usePeerGame() {
     setMode('single');
     setMySeat(0);
     setConnectedSeats([]);
+    setPlayerNames([null, null, null, null]);
     setRoomCode(null);
     setStatus(null);
     setGameState(loadSavedState() || createInitialState());
@@ -336,10 +346,12 @@ export function usePeerGame() {
     setGameState(createInitialState());
   }, [isHost]);
 
-  const createGame = useCallback(() => {
+  const createGame = useCallback((name) => {
     cleanupPeer();
     setStatus('connecting');
     setConnectedSeats([]);
+    const hostName = typeof name === 'string' ? name.trim().slice(0, 12) : '';
+    setPlayerNames([hostName || null, null, null, null]);
 
     const attempt = () => {
       const code = makeRoomCode();
@@ -380,6 +392,16 @@ export function usePeerGame() {
           connsRef.current.set(seat, conn);
           setConnectedSeats(Array.from(connsRef.current.keys()));
 
+          // The joiner's chosen name travels in the connection metadata.
+          const rawName = conn.metadata && typeof conn.metadata.name === 'string'
+            ? conn.metadata.name.trim().slice(0, 12)
+            : '';
+          setPlayerNames((prev) => {
+            const next = [...prev];
+            next[seat] = rawName || null;
+            return next;
+          });
+
           conn.send({ type: 'welcome', seat });
           conn.send({ type: 'state', gameState: gameStateRef.current });
 
@@ -392,6 +414,12 @@ export function usePeerGame() {
             try { conn.close(); } catch { /* ignore */ }
             connsRef.current.delete(seat);
             setConnectedSeats(Array.from(connsRef.current.keys()));
+            setPlayerNames((prev) => {
+              if (!prev[seat]) return prev;
+              const next = [...prev];
+              next[seat] = null;
+              return next;
+            });
           };
 
           conn.on('data', (data) => {
@@ -418,17 +446,20 @@ export function usePeerGame() {
     attempt();
   }, [cleanupPeer]);
 
-  const joinGame = useCallback((code) => {
+  const joinGame = useCallback((code, name) => {
     if (!code) return;
     cleanupPeer();
     setStatus('connecting');
+    setPlayerNames([null, null, null, null]);
+
+    const myName = typeof name === 'string' ? name.trim().slice(0, 12) : '';
 
     const peer = new Peer();
     peerRef.current = peer;
 
     peer.on('open', () => {
       const hostId = CODE_PREFIX + code.trim().toUpperCase();
-      const conn = peer.connect(hostId, { reliable: true });
+      const conn = peer.connect(hostId, { reliable: true, metadata: { name: myName } });
       hostConnRef.current = conn;
 
       conn.on('open', () => setStatus('connected'));
@@ -442,6 +473,8 @@ export function usePeerGame() {
           setStatus('connected');
         } else if (data.type === 'state') {
           setGameState(data.gameState);
+        } else if (data.type === 'names') {
+          setPlayerNames(data.names);
         } else if (data.type === 'full') {
           setStatus('full');
         }
@@ -471,6 +504,7 @@ export function usePeerGame() {
     mySeat,
     roomCode,
     connectedSeats,
+    playerNames,
     status,
     dispatch,
     startSingle,

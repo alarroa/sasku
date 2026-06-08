@@ -14,6 +14,7 @@ function App() {
         mode={game.mode}
         roomCode={game.mode === 'host' ? game.roomCode : null}
         connectedSeats={game.connectedSeats}
+        playerNames={game.playerNames}
         status={game.status}
         onNewGame={game.isHost ? game.resetGame : undefined}
         onCreateGame={game.createGame}

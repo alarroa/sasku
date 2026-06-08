@@ -75,6 +75,8 @@ export const et = {
     host: 'Loo võrgumäng',
     join: 'Liitu mänguga',
     enterCode: 'Sisesta ruumikood',
+    yourName: 'Sinu nimi',
+    namePlaceholder: 'Nimi',
     connect: 'Ühenda',
     back: 'Tagasi',
     menu: 'Menüü',

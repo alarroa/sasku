@@ -1,5 +1,4 @@
 import Card from './Card';
-import { et } from '../i18n/et';
 
 export default function PlayerSpot({
   position,
@@ -8,7 +7,6 @@ export default function PlayerSpot({
   playedCard,
   isCurrentPlayer,
   isWinner,
-  isPartner,
   trumpSuit,
   trumpIcon,
   isHuman,
@@ -33,10 +31,6 @@ export default function PlayerSpot({
           </span>
         )}
       </div>
-
-      {isPartner && !isHuman && (
-        <div className="player-partner-badge">{et.players.partner}</div>
-      )}
 
       {showStack && (
         <div className="player-stack" aria-hidden="true">

@@ -19,6 +19,9 @@ import './GameBoard.css';
 const RELATIVE_NAMES = [et.players.you, et.players.player2, et.players.partner, et.players.player4];
 const RELATIVE_POS = ['bottom', 'left', 'top', 'right'];
 
+// Remembers the name the player last used to join a networked game
+const NAME_STORAGE_KEY = 'sasku-player-name';
+
 export default function GameBoard({
   gameState,
   mySeat = 0,
@@ -26,6 +29,7 @@ export default function GameBoard({
   mode = 'single',
   roomCode = null,
   connectedSeats = [],
+  playerNames = [],
   status = null,
   onNewGame,
   onCreateGame,
@@ -35,6 +39,9 @@ export default function GameBoard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState('main'); // 'main' | 'join'
   const [joinCode, setJoinCode] = useState('');
+  const [joinName, setJoinName] = useState(() => {
+    try { return localStorage.getItem(NAME_STORAGE_KEY) || ''; } catch { return ''; }
+  });
   // Id of the completed trick that has been faded out. Comparing against the
   // current last-trick id avoids a second setState-in-effect to reset a flag.
   const [hiddenTrickId, setHiddenTrickId] = useState(null);
@@ -57,6 +64,14 @@ export default function GameBoard({
   // Position of an absolute seat relative to the viewer (0 = self, clockwise)
   const relPos = (seat) => (seat - mySeat + 4) % 4;
 
+  // Label for a seat: the viewer is always "you"; other seats use the joiner's
+  // custom name when known, otherwise the generic relative label.
+  const seatName = (seat) => {
+    const rp = relPos(seat);
+    if (rp === 0) return RELATIVE_NAMES[0];
+    return playerNames[seat] || RELATIVE_NAMES[rp];
+  };
+
   // Am I the partner who must choose a card to give back in a pending exchange?
   const exchange = gameState.pendingPictureExchange;
   const amExchangeResponder = !!exchange && mySeat === getPartner(exchange.fromPlayer);
@@ -73,12 +88,23 @@ export default function GameBoard({
 
   const closeMenu = () => { setMenuOpen(false); setMenuView('main'); };
 
-  const handleCreateGame = () => { closeMenu(); onCreateGame && onCreateGame(); };
+  const handleCreateSubmit = (e) => {
+    e.preventDefault();
+    if (!onCreateGame) return;
+    const name = joinName.trim().slice(0, 12);
+    try { localStorage.setItem(NAME_STORAGE_KEY, name); } catch { /* ignore */ }
+    closeMenu();
+    onCreateGame(name);
+  };
 
   const handleJoinSubmit = (e) => {
     e.preventDefault();
-    const code = joinCode.trim().toUpperCase();
-    if (code && onJoinGame) { closeMenu(); onJoinGame(code); }
+    const code = joinCode.replace(/\D/g, '');
+    if (code.length !== 4 || !onJoinGame) return;
+    const name = joinName.trim().slice(0, 12);
+    try { localStorage.setItem(NAME_STORAGE_KEY, name); } catch { /* ignore */ }
+    closeMenu();
+    onJoinGame(code, name);
   };
 
   // Transient connection feedback shown as a toast (the menu closes on submit).
@@ -338,10 +364,8 @@ export default function GameBoard({
     const positions = [0, 1, 2, 3].map((seat) => ({
       index: seat,
       position: RELATIVE_POS[relPos(seat)],
-      name: RELATIVE_NAMES[relPos(seat)]
+      name: seatName(seat)
     }));
-
-    const myPartner = getPartner(mySeat);
 
     const showingLastTrick = (gameState.lastTrick && gameState.currentTrick.length === 0) ||
                              gameState.phase === GAME_PHASES.ROUND_END;
@@ -412,7 +436,6 @@ export default function GameBoard({
               playedCard={card}
               isCurrentPlayer={isCurrentPlayer}
               isWinner={isWinner}
-              isPartner={index === myPartner}
               trumpSuit={gameState.trumpSuit}
               trumpIcon={trumpIcon}
               isHuman={index === mySeat}
@@ -472,14 +495,18 @@ export default function GameBoard({
         <span className="room-code-label">{et.lobby.roomCode}</span>
         <span className="room-code-value">{roomCode}</span>
         <span className="room-players">
-          {[2, 1, 3].map((seat) => (
-            <span
-              key={seat}
-              className={`room-seat ${connectedSeats.includes(seat) ? 'filled' : 'ai'}`}
-            >
-              {seatLabel(seat)}: {connectedSeats.includes(seat) ? '✓' : et.lobby.empty}
-            </span>
-          ))}
+          {[2, 1, 3].map((seat) => {
+            const connected = connectedSeats.includes(seat);
+            const filledLabel = playerNames[seat] || '✓';
+            return (
+              <span
+                key={seat}
+                className={`room-seat ${connected ? 'filled' : 'ai'}`}
+              >
+                {seatLabel(seat)}: {connected ? filledLabel : et.lobby.empty}
+              </span>
+            );
+          })}
         </span>
       </div>
     );
@@ -546,7 +573,7 @@ export default function GameBoard({
                     <>
                       <button
                         className="settings-item"
-                        onClick={handleCreateGame}
+                        onClick={() => setMenuView('create')}
                         disabled={isConnecting}
                       >
                         {et.lobby.host}
@@ -571,8 +598,55 @@ export default function GameBoard({
                 </>
               )}
 
+              {menuView === 'create' && (
+                <form className="settings-join" onSubmit={handleCreateSubmit}>
+                  <label className="settings-join-label" htmlFor="host-name">
+                    {et.lobby.yourName}
+                  </label>
+                  <input
+                    id="host-name"
+                    className="settings-name-input"
+                    type="text"
+                    value={joinName}
+                    maxLength={12}
+                    autoComplete="off"
+                    placeholder={et.lobby.namePlaceholder}
+                    onChange={(e) => setJoinName(e.target.value)}
+                  />
+                  <div className="settings-join-actions">
+                    <button
+                      type="submit"
+                      className="settings-item primary"
+                      disabled={isConnecting}
+                    >
+                      {et.lobby.host}
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-item"
+                      onClick={() => setMenuView('main')}
+                    >
+                      {et.lobby.back}
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {menuView === 'join' && (
                 <form className="settings-join" onSubmit={handleJoinSubmit}>
+                  <label className="settings-join-label" htmlFor="player-name">
+                    {et.lobby.yourName}
+                  </label>
+                  <input
+                    id="player-name"
+                    className="settings-name-input"
+                    type="text"
+                    value={joinName}
+                    maxLength={12}
+                    autoComplete="off"
+                    placeholder={et.lobby.namePlaceholder}
+                    onChange={(e) => setJoinName(e.target.value)}
+                  />
                   <label className="settings-join-label" htmlFor="room-code">
                     {et.lobby.enterCode}
                   </label>
@@ -580,18 +654,19 @@ export default function GameBoard({
                     id="room-code"
                     className="settings-join-input"
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={joinCode}
                     maxLength={4}
                     autoComplete="off"
-                    autoCapitalize="characters"
-                    placeholder="ABCD"
-                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="1234"
+                    onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   />
                   <div className="settings-join-actions">
                     <button
                       type="submit"
                       className="settings-item primary"
-                      disabled={isConnecting || !joinCode.trim()}
+                      disabled={isConnecting || joinCode.length !== 4}
                     >
                       {et.lobby.connect}
                     </button>
