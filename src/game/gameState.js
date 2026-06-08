@@ -209,14 +209,19 @@ export function passBid(state, playerIndex) {
     newState.leadPlayer = getNextPlayer(newState.dealer);
     newState.currentPlayer = newState.leadPlayer;
   }
-  // Three passed - winner determined
+  // Three passed - the remaining player wins, but only if they have
+  // actually made a bid. If the first three pass before the fourth player
+  // has had a turn, leave currentPlayer on them so they can still bid/pass.
   else if (passCount === 3) {
     const winnerIndex = newState.bids.findIndex((bid, i) => bid !== null && !newState.hasPassed[i]);
-    newState.trumpMaker = winnerIndex;
-    newState.currentPlayer = winnerIndex;
-    // Trump will be chosen by AI or shown to human
-    // For now, stay in BIDDING phase until trump is chosen
-    // Or automatically choose for AI
+    if (winnerIndex !== -1) {
+      newState.trumpMaker = winnerIndex;
+      newState.currentPlayer = winnerIndex;
+      // Trump will be chosen by AI or shown to human; stay in BIDDING
+      // phase until trump is chosen.
+    }
+    // else: the only non-passed player hasn't bid yet. currentPlayer was
+    // already advanced to them above, so let them take their turn.
   }
 
   return newState;

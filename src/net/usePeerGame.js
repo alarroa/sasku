@@ -263,7 +263,8 @@ export function usePeerGame() {
         setMySeat(0);
         setMode('host');
         setStatus('ready');
-        setGameState(loadSavedState() || createInitialState());
+        // Networked games always start fresh (single-player save is left intact)
+        setGameState(createInitialState());
       });
 
       peer.on('error', (err) => {
