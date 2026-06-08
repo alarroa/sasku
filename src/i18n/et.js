@@ -78,6 +78,8 @@ export const et = {
     connect: 'Ühenda',
     back: 'Tagasi',
     menu: 'Menüü',
+    leaveNetwork: 'Lahku võrgumängust',
+    connected: 'Ühendatud',
     roomCode: 'Ruumikood',
     connecting: 'Ühendan...',
     connectionError: 'Ühendus ebaõnnestus',

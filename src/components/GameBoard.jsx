@@ -23,12 +23,18 @@ export default function GameBoard({
   gameState,
   mySeat = 0,
   dispatch,
+  mode = 'single',
   roomCode = null,
   connectedSeats = [],
+  status = null,
   onNewGame,
-  onLeaveToMenu
+  onCreateGame,
+  onJoinGame,
+  onLeaveNetwork
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuView, setMenuView] = useState('main'); // 'main' | 'join'
+  const [joinCode, setJoinCode] = useState('');
   // Id of the completed trick that has been faded out. Comparing against the
   // current last-trick id avoids a second setState-in-effect to reset a flag.
   const [hiddenTrickId, setHiddenTrickId] = useState(null);
@@ -64,6 +70,29 @@ export default function GameBoard({
   const handleNewRound = () => dispatch({ type: 'newRound' });
   const handleNewMatch = () => dispatch({ type: 'newMatch' });
   const handleExchangePictureClick = () => dispatch({ type: 'initiateExchange' });
+
+  const closeMenu = () => { setMenuOpen(false); setMenuView('main'); };
+
+  const handleCreateGame = () => { closeMenu(); onCreateGame && onCreateGame(); };
+
+  const handleJoinSubmit = (e) => {
+    e.preventDefault();
+    const code = joinCode.trim().toUpperCase();
+    if (code && onJoinGame) { closeMenu(); onJoinGame(code); }
+  };
+
+  // Transient connection feedback shown as a toast (the menu closes on submit).
+  const connectionMessage = () => {
+    switch (status) {
+      case 'connecting': return et.lobby.connecting;
+      case 'error': return et.lobby.connectionError;
+      case 'notfound': return et.lobby.notFound;
+      case 'full': return et.lobby.roomFull;
+      case 'disconnected': return et.lobby.disconnected;
+      default: return null;
+    }
+  };
+  const isConnecting = status === 'connecting';
 
   const handleOmale = () => {
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
@@ -496,32 +525,93 @@ export default function GameBoard({
           <button
             className="settings-button"
             aria-label={et.lobby.menu}
-            onClick={() => setMenuOpen(o => !o)}
+            onClick={() => { setMenuOpen(o => !o); setMenuView('main'); }}
           >
             ⚙
           </button>
           {menuOpen && (
             <div className="settings-dropdown">
-              {onNewGame && (
-                <button
-                  className="settings-item"
-                  onClick={() => { setMenuOpen(false); onNewGame(); }}
-                >
-                  {et.gameEnd.newGame}
-                </button>
+              {menuView === 'main' && (
+                <>
+                  {onNewGame && (
+                    <button
+                      className="settings-item"
+                      onClick={() => { closeMenu(); onNewGame(); }}
+                    >
+                      {et.gameEnd.newGame}
+                    </button>
+                  )}
+
+                  {mode === 'single' && (
+                    <>
+                      <button
+                        className="settings-item"
+                        onClick={handleCreateGame}
+                        disabled={isConnecting}
+                      >
+                        {et.lobby.host}
+                      </button>
+                      <button
+                        className="settings-item"
+                        onClick={() => setMenuView('join')}
+                      >
+                        {et.lobby.join}
+                      </button>
+                    </>
+                  )}
+
+                  {(mode === 'host' || mode === 'client') && onLeaveNetwork && (
+                    <button
+                      className="settings-item"
+                      onClick={() => { closeMenu(); onLeaveNetwork(); }}
+                    >
+                      {et.lobby.leaveNetwork}
+                    </button>
+                  )}
+                </>
               )}
-              {onLeaveToMenu && (
-                <button
-                  className="settings-item"
-                  onClick={() => { setMenuOpen(false); onLeaveToMenu(); }}
-                >
-                  {et.lobby.menu}
-                </button>
+
+              {menuView === 'join' && (
+                <form className="settings-join" onSubmit={handleJoinSubmit}>
+                  <label className="settings-join-label" htmlFor="room-code">
+                    {et.lobby.enterCode}
+                  </label>
+                  <input
+                    id="room-code"
+                    className="settings-join-input"
+                    type="text"
+                    value={joinCode}
+                    maxLength={4}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    placeholder="ABCD"
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  />
+                  <div className="settings-join-actions">
+                    <button
+                      type="submit"
+                      className="settings-item primary"
+                      disabled={isConnecting || !joinCode.trim()}
+                    >
+                      {et.lobby.connect}
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-item"
+                      onClick={() => setMenuView('main')}
+                    >
+                      {et.lobby.back}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           )}
         </div>
       </header>
+      {connectionMessage() && (
+        <div className={`connection-toast ${status}`}>{connectionMessage()}</div>
+      )}
       {renderRoomBanner()}
       {renderGameEnd()}
       {renderDealChoice()}

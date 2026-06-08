@@ -1,5 +1,4 @@
 import GameBoard from './components/GameBoard'
-import Lobby from './components/Lobby'
 import { usePeerGame } from './net/usePeerGame'
 import './App.css'
 
@@ -8,24 +7,19 @@ function App() {
 
   return (
     <div className="app">
-      {game.mode === 'menu' ? (
-        <Lobby
-          onSingle={game.startSingle}
-          onHost={game.createGame}
-          onJoin={game.joinGame}
-          status={game.status}
-        />
-      ) : (
-        <GameBoard
-          gameState={game.gameState}
-          mySeat={game.mySeat}
-          dispatch={game.dispatch}
-          roomCode={game.mode === 'host' ? game.roomCode : null}
-          connectedSeats={game.connectedSeats}
-          onNewGame={game.isHost ? game.resetGame : undefined}
-          onLeaveToMenu={game.leaveToMenu}
-        />
-      )}
+      <GameBoard
+        gameState={game.gameState}
+        mySeat={game.mySeat}
+        dispatch={game.dispatch}
+        mode={game.mode}
+        roomCode={game.mode === 'host' ? game.roomCode : null}
+        connectedSeats={game.connectedSeats}
+        status={game.status}
+        onNewGame={game.isHost ? game.resetGame : undefined}
+        onCreateGame={game.createGame}
+        onJoinGame={game.joinGame}
+        onLeaveNetwork={game.startSingle}
+      />
     </div>
   )
 }

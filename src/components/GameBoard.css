@@ -189,8 +189,89 @@
     transition: background var(--transition-quick);
 }
 
-.settings-item:hover {
+.settings-item:hover:not(:disabled) {
     background: rgba(140, 100, 40, 0.18);
+}
+
+.settings-item:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.settings-item.primary {
+    background: var(--gold-dim);
+    color: var(--paper);
+    text-align: center;
+}
+
+.settings-item.primary:hover:not(:disabled) {
+    background: var(--gold, var(--gold-dim));
+}
+
+.settings-join {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 6px;
+    min-width: 180px;
+}
+
+.settings-join-label {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.settings-join-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-align: center;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--paper);
+    border: 2px solid var(--gold-dim);
+    border-radius: var(--radius-sm);
+}
+
+.settings-join-input:focus {
+    outline: none;
+    border-color: var(--gold, var(--gold-dim));
+}
+
+.settings-join-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.connection-toast {
+    position: fixed;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    padding: 8px 16px;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--paper);
+    background: var(--gold-dim);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-wood-deep);
+    white-space: nowrap;
+}
+
+.connection-toast.error,
+.connection-toast.notfound,
+.connection-toast.full,
+.connection-toast.disconnected {
+    background: #b23b3b;
 }
 
 /* ============================================================

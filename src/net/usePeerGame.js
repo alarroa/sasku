@@ -30,8 +30,9 @@ const CODE_PREFIX = 'sasku-';
 // seats 1 & 3 = opponents (join afterwards). Empty seats are AI.
 const SEAT_ORDER = [2, 1, 3];
 
-// Modes: 'menu' | 'single' | 'host' | 'client'
-// In 'single' and 'host' modes this peer owns the authoritative game state.
+// Modes: 'single' | 'host' | 'client'. The app boots in 'single'; network play
+// is started from the in-game menu. In 'single' and 'host' modes this peer owns
+// the authoritative game state.
 
 function makeRoomCode() {
   // Avoid ambiguous characters (0/O, 1/I)
@@ -144,8 +145,10 @@ function applyAction(state, seat, action) {
 }
 
 export function usePeerGame() {
-  const [mode, setMode] = useState('menu');
-  const [gameState, setGameState] = useState(null);
+  // Boot straight into a single-player game (resuming any saved game). The old
+  // landing menu is gone; network play is started from the in-game menu.
+  const [mode, setMode] = useState('single');
+  const [gameState, setGameState] = useState(() => loadSavedState() || createInitialState());
   const [mySeat, setMySeat] = useState(0);
   const [roomCode, setRoomCode] = useState(null);
   const [connectedSeats, setConnectedSeats] = useState([]);
@@ -294,6 +297,11 @@ export function usePeerGame() {
     });
     connsRef.current.clear();
     if (hostConnRef.current) {
+      // Tell the host we're leaving so it can hand our seat to the AI right
+      // away, without waiting on WebRTC's (unreliable) close detection.
+      try {
+        if (hostConnRef.current.open) hostConnRef.current.send({ type: 'leave' });
+      } catch { /* ignore */ }
       try { hostConnRef.current.close(); } catch { /* ignore */ }
       hostConnRef.current = null;
     }
@@ -375,15 +383,33 @@ export function usePeerGame() {
           conn.send({ type: 'welcome', seat });
           conn.send({ type: 'state', gameState: gameStateRef.current });
 
+          // Free this seat (idempotent) so the AI driver takes it over. Used by
+          // every disconnect path below — graceful leave, close, error, or a
+          // dropped ICE connection — regardless of which seat (partner or
+          // opponent) the player occupied.
+          const releaseSeat = () => {
+            if (connsRef.current.get(seat) !== conn) return;
+            try { conn.close(); } catch { /* ignore */ }
+            connsRef.current.delete(seat);
+            setConnectedSeats(Array.from(connsRef.current.keys()));
+          };
+
           conn.on('data', (data) => {
             if (data && data.type === 'action') {
               setGameState((prev) => applyAction(prev, seat, data.action));
+            } else if (data && data.type === 'leave') {
+              releaseSeat();
             }
           });
 
-          conn.on('close', () => {
-            connsRef.current.delete(seat);
-            setConnectedSeats(Array.from(connsRef.current.keys()));
+          conn.on('close', releaseSeat);
+          conn.on('error', releaseSeat);
+          // WebRTC's 'close' is unreliable when a tab is closed abruptly; the
+          // ICE state change is the dependable signal for a vanished peer.
+          conn.on('iceStateChanged', (state) => {
+            if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+              releaseSeat();
+            }
           });
         });
       });
@@ -435,16 +461,6 @@ export function usePeerGame() {
     });
   }, [cleanupPeer]);
 
-  const leaveToMenu = useCallback(() => {
-    cleanupPeer();
-    setMode('menu');
-    setGameState(null);
-    setMySeat(0);
-    setConnectedSeats([]);
-    setRoomCode(null);
-    setStatus(null);
-  }, [cleanupPeer]);
-
   // Clean up the peer connection when the component unmounts
   useEffect(() => cleanupPeer, [cleanupPeer]);
 
@@ -460,7 +476,6 @@ export function usePeerGame() {
     startSingle,
     createGame,
     joinGame,
-    resetGame,
-    leaveToMenu
+    resetGame
   };
 }
