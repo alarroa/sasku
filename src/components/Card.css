@@ -1,46 +1,52 @@
 .card {
-  width: 70px;
-  height: 100px;
-  border: 2px solid #333;
-  border-radius: 8px;
+  width: 76px;
+  height: 106px; /* 5:7 ratio */
+  border-radius: 6px;
   background: white;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
   position: relative;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  transition:
+    transform var(--transition-smooth),
+    box-shadow var(--transition-smooth),
+    outline-color var(--transition-smooth);
   user-select: none;
+  box-shadow: var(--shadow-card);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  overflow: hidden;
+}
+
+.card-svg-wrapper {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
 }
 
 .card:hover:not(.disabled) {
-  transform: translateY(-10px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  transform: translateY(-12px);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .card.selected {
-  transform: translateY(-15px);
-  border-color: #4CAF50;
-  box-shadow: 0 6px 12px rgba(76, 175, 80, 0.3);
+  transform: translateY(-16px);
+  outline-color: var(--gold-bright);
+  box-shadow: 0 8px 18px rgba(232, 200, 120, 0.5), var(--shadow-card);
 }
 
 .card.active {
-  border-color: #2196F3;
-  border-width: 3px;
-  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
+  outline-color: var(--gold);
+  box-shadow: var(--shadow-card), 0 0 8px rgba(232, 200, 120, 0.3);
 }
 
 .card.active:hover {
   transform: translateY(-12px);
-  box-shadow: 0 6px 12px rgba(33, 150, 243, 0.5);
+  box-shadow: var(--shadow-card-hover), 0 0 14px rgba(232, 200, 120, 0.5);
 }
 
 .card.disabled {
-  opacity: 0.4;
   cursor: not-allowed;
-  filter: grayscale(60%);
-  border-color: #999;
+  filter: brightness(0.65) saturate(0.4);
 }
 
 /* During bidding (active + disabled), cards look normal but can't be clicked */
@@ -48,69 +54,35 @@
   opacity: 1;
   filter: none;
   cursor: default;
-  border-color: #2196F3;
-  border-width: 3px;
+  outline-color: var(--gold);
 }
 
-.card.red {
-  color: #d32f2f;
+/* Trump cards get a subtle gold outline */
+.card.trump {
+  outline-color: var(--gold);
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1px rgba(232, 200, 120, 0.45);
 }
 
-.card.black {
-  color: #000;
+.card.trump:hover:not(.disabled) {
+  box-shadow:
+    var(--shadow-card-hover),
+    0 0 14px rgba(232, 200, 120, 0.55);
 }
 
-.card-rank {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.card-suit {
-  font-size: 32px;
-}
-
-.picture-badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #ff9800;
-  color: white;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
+.card.trump.selected {
+  outline-color: var(--gold-bright);
 }
 
 /* Mobile responsive */
 @media (max-width: 768px) {
   .card {
-    width: 65px;
-    height: 90px;
-  }
-
-  .card-rank {
-    font-size: 18px;
-    margin-bottom: 3px;
-  }
-
-  .card-suit {
-    font-size: 26px;
-  }
-
-  .picture-badge {
-    width: 18px;
-    height: 18px;
-    font-size: 11px;
-    top: 3px;
-    right: 3px;
+    width: 60px;
+    height: 84px;
   }
 
   .card:hover:not(.disabled) {
-    transform: translateY(-5px);
+    transform: translateY(-6px);
   }
 }

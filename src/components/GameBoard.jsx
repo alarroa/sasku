@@ -1,27 +1,48 @@
+import { useState, useEffect } from 'react';
 import Hand from './Hand';
 import Card from './Card';
+import PlayerSpot from './PlayerSpot';
 import {
   GAME_PHASES,
   DEAL_OPTIONS,
   canPlayCard,
-  getTeam
+  getTeam,
+  getPartner,
+  canExchangePicture
 } from '../game/gameState';
 import { SUITS, SUIT_NAMES_ET, SUIT_SYMBOLS, calculateBiddingValue } from '../game/cards';
 import { et } from '../i18n/et';
 import './GameBoard.css';
 
-// Names indexed by position RELATIVE to the viewer:
+// Names/positions indexed by position RELATIVE to the viewer:
 // 0 = you (bottom), 1 = left opponent, 2 = partner (top), 3 = right opponent
 const RELATIVE_NAMES = [et.players.you, et.players.player2, et.players.partner, et.players.player4];
-const RELATIVE_CLASS = ['player-bottom', 'player-left', 'player-top', 'player-right'];
+const RELATIVE_POS = ['bottom', 'left', 'top', 'right'];
 
 export default function GameBoard({
   gameState,
   mySeat = 0,
   dispatch,
   roomCode = null,
-  connectedSeats = []
+  connectedSeats = [],
+  onNewGame,
+  onLeaveToMenu
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Id of the completed trick that has been faded out. Comparing against the
+  // current last-trick id avoids a second setState-in-effect to reset a flag.
+  const [hiddenTrickId, setHiddenTrickId] = useState(null);
+
+  // Fade out the just-completed trick a couple of seconds after it finishes
+  useEffect(() => {
+    if (!gameState || !gameState.lastTrick) return;
+    if (gameState.currentTrick.length !== 0 || gameState.phase !== GAME_PHASES.PLAYING) return;
+    const trickId = gameState.lastTrick.trick.map(p => p.card.id).join(',');
+    if (trickId === hiddenTrickId) return;
+    const timer = setTimeout(() => setHiddenTrickId(trickId), 2000);
+    return () => clearTimeout(timer);
+  }, [gameState, hiddenTrickId]);
+
   if (!gameState) return null;
 
   const myTeam = getTeam(mySeat);
@@ -29,6 +50,10 @@ export default function GameBoard({
 
   // Position of an absolute seat relative to the viewer (0 = self, clockwise)
   const relPos = (seat) => (seat - mySeat + 4) % 4;
+
+  // Am I the partner who must choose a card to give back in a pending exchange?
+  const exchange = gameState.pendingPictureExchange;
+  const amExchangeResponder = !!exchange && mySeat === getPartner(exchange.fromPlayer);
 
   const handleDealChoice = (option) => dispatch({ type: 'dealChoice', option });
   const handlePackChoice = (packIndex) => dispatch({ type: 'packChoice', index: packIndex });
@@ -38,6 +63,7 @@ export default function GameBoard({
   const handleTrumpChoice = (suit) => dispatch({ type: 'trump', suit });
   const handleNewRound = () => dispatch({ type: 'newRound' });
   const handleNewMatch = () => dispatch({ type: 'newMatch' });
+  const handleExchangePictureClick = () => dispatch({ type: 'initiateExchange' });
 
   const handleOmale = () => {
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
@@ -45,6 +71,12 @@ export default function GameBoard({
   };
 
   const handleCardPlay = (card) => {
+    // If I'm the partner being offered a picture, this click picks the give-back card
+    if (amExchangeResponder) {
+      if (card.isPicture) return;
+      dispatch({ type: 'exchangeGiveBack', card });
+      return;
+    }
     if (!canPlayCard(gameState, mySeat, card)) return;
     dispatch({ type: 'playCard', card });
   };
@@ -53,7 +85,8 @@ export default function GameBoard({
     return gameState.phase === GAME_PHASES.BIDDING &&
            gameState.currentPlayer === mySeat &&
            !gameState.hasPassed[mySeat] &&
-           gameState.trumpMaker === null;
+           gameState.trumpMaker === null &&
+           !gameState.pendingPictureExchange;
   };
 
   const renderDealChoice = () => {
@@ -118,15 +151,13 @@ export default function GameBoard({
     // Minimum bid is 5
     const minBid = Math.max(5, currentHighBid + 1);
 
-    // Check if "Omale" is available
-    // Player can say "Omale" if they made a bid before the current high bidder
+    // Check if "Omale" is available: player made a bid before the current high bidder
     let canOmale = false;
     if (currentHighBid > 0 && currentHighBid <= maxPossibleBid) {
       const bidsWithPlayers = gameState.bids.map((b, i) => ({ bid: b, player: i }))
         .filter(b => b.bid !== null);
 
       if (bidsWithPlayers.length >= 2) {
-        // Check if this player made a bid before the current high bid
         for (let i = bidsWithPlayers.length - 1; i >= 0; i--) {
           if (bidsWithPlayers[i].bid < currentHighBid && bidsWithPlayers[i].player === mySeat) {
             canOmale = true;
@@ -139,6 +170,8 @@ export default function GameBoard({
     for (let i = minBid; i <= maxPossibleBid; i++) {
       possibleBids.push(i);
     }
+
+    const canExchange = canExchangePicture(gameState, mySeat);
 
     return (
       <>
@@ -157,7 +190,12 @@ export default function GameBoard({
           <button className="ruutu-button" onClick={handleRuutuBid}>
             {et.bidding.ruutuButton}
           </button>
-            <button className="pass-button" onClick={handlePass}>{et.bidding.pass}</button>
+          {canExchange && (
+            <button className="exchange-button" onClick={handleExchangePictureClick}>
+              {et.bidding.exchangePicture}
+            </button>
+          )}
+          <button className="pass-button" onClick={handlePass}>{et.bidding.pass}</button>
         </div>
       </>
     );
@@ -172,18 +210,15 @@ export default function GameBoard({
   const renderTrumpChoice = () => {
     if (!shouldShowTrumpChoice()) return null;
 
-    // Calculate valid trump suits based on the bid and hand
     const hand = gameState.hands[mySeat];
     const myBid = gameState.bids[mySeat];
     const pictures = hand.filter(c => c.isPicture).length;
 
-    // Count cards by suit (excluding pictures)
     const suitCounts = {};
     hand.filter(c => !c.isPicture).forEach(c => {
       suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
     });
 
-    // Find all suits that allow the bid
     // Bid = pictures + suit_count, so suit_count = bid - pictures
     const requiredSuitCount = myBid - pictures;
     const validSuits = Object.keys(suitCounts).filter(suit =>
@@ -213,8 +248,6 @@ export default function GameBoard({
 
   const getPlayerStatus = (playerIndex) => {
     const parts = [];
-
-    // Show bid or pass during bidding
     if (gameState.phase === GAME_PHASES.BIDDING) {
       if (gameState.hasPassed[playerIndex]) {
         parts.push(et.bidding.pass);
@@ -222,12 +255,10 @@ export default function GameBoard({
         parts.push(`${gameState.bids[playerIndex]}`);
       }
     }
-
     return parts.length > 0 ? ` (${parts.join(' ')})` : '';
   };
 
   const getTrumpIcon = (playerIndex) => {
-    // Show trump icon for trump maker during playing
     if (gameState.phase === GAME_PHASES.PLAYING &&
         gameState.trumpMaker === playerIndex &&
         gameState.trumpSuit) {
@@ -237,14 +268,18 @@ export default function GameBoard({
   };
 
   const getPlayerCard = (playerIndex) => {
-    // Show cards from current trick (cards being played right now)
+    // Cards being played right now
     const play = gameState.currentTrick.find(p => p.player === playerIndex);
     if (play) return play.card;
 
-    // Also show last completed trick (for the 2.5s delay or during round end)
-    if (gameState.lastTrick && (gameState.currentTrick.length === 0 || gameState.phase === GAME_PHASES.ROUND_END)) {
-      const lastPlay = gameState.lastTrick.trick.find(p => p.player === playerIndex);
-      if (lastPlay) return lastPlay.card;
+    // Last completed trick (during the brief delay or at round end)
+    if (gameState.lastTrick &&
+        (gameState.currentTrick.length === 0 || gameState.phase === GAME_PHASES.ROUND_END)) {
+      const trickId = gameState.lastTrick.trick.map(p => p.card.id).join(',');
+      if (trickId !== hiddenTrickId) {
+        const lastPlay = gameState.lastTrick.trick.find(p => p.player === playerIndex);
+        if (lastPlay) return lastPlay.card;
+      }
     }
 
     return null;
@@ -252,8 +287,6 @@ export default function GameBoard({
 
   const calculateCurrentTrickPoints = () => {
     const teamPoints = [0, 0];
-
-    // Count points from won tricks
     gameState.tricksWon.forEach((tricks, playerIndex) => {
       const team = getTeam(playerIndex);
       tricks.forEach(trick => {
@@ -262,65 +295,31 @@ export default function GameBoard({
         });
       });
     });
-
     return teamPoints;
   };
 
   const renderPlayArea = () => {
-    // Show play area during bidding, playing, and round end
     const shouldShow = gameState.phase === GAME_PHASES.BIDDING ||
                        gameState.phase === GAME_PHASES.PLAYING ||
                        gameState.phase === GAME_PHASES.ROUND_END;
 
     if (!shouldShow) return null;
 
-    // Players placed by position relative to the viewer (viewer always at bottom)
+    // Place each seat by its position relative to the viewer (viewer at bottom)
     const positions = [0, 1, 2, 3].map((seat) => ({
       index: seat,
-      className: RELATIVE_CLASS[relPos(seat)],
+      position: RELATIVE_POS[relPos(seat)],
       name: RELATIVE_NAMES[relPos(seat)]
     }));
 
-    // Check if we're showing last trick
+    const myPartner = getPartner(mySeat);
+
     const showingLastTrick = (gameState.lastTrick && gameState.currentTrick.length === 0) ||
                              gameState.phase === GAME_PHASES.ROUND_END;
     const trickWinner = showingLastTrick ? gameState.lastTrick.winner : null;
 
-    // Calculate trick points for display
-    const currentPoints = calculateCurrentTrickPoints();
-
     return (
       <div className="play-area">
-        {/* Top-left: Trick points */}
-        <div className="corner-info top-left">
-          <div className="corner-label">{et.scoring.trickPoints}</div>
-          <div className="corner-scores">
-            <div className="corner-score-row">
-              <span className="score-label">{et.scoring.ourTeam}:</span>
-              <span className="score-value">{currentPoints[myTeam]}</span>
-            </div>
-            <div className="corner-score-row">
-              <span className="score-label">{et.scoring.theirTeam}:</span>
-              <span className="score-value">{currentPoints[oppTeam]}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Top-right: Game scores */}
-        <div className="corner-info top-right">
-          <div className="corner-label">{et.scoring.gameStatus}</div>
-          <div className="corner-scores">
-            <div className="corner-score-row">
-              <span className="score-label">{et.scoring.ourTeam}:</span>
-              <span className="score-value">{gameState.gameScores[myTeam]} | {gameState.matchWins[myTeam]}</span>
-            </div>
-            <div className="corner-score-row">
-              <span className="score-label">{et.scoring.theirTeam}:</span>
-              <span className="score-value">{gameState.gameScores[oppTeam]} | {gameState.matchWins[oppTeam]}</span>
-            </div>
-          </div>
-        </div>
-
         {/* Bottom overlays for bidding/trump */}
         {shouldShowBiddingControls() && (
           <div className="bottom-overlay">
@@ -338,15 +337,26 @@ export default function GameBoard({
           </div>
         )}
 
+        {/* Picture exchange offered to me — I choose which card to give back */}
+        {amExchangeResponder && (
+          <div className="center-overlay exchange-overlay">
+            <div className="overlay-content">
+              <h3>{et.bidding.partnerOffersPicture}</h3>
+              <div className="exchange-picture-preview">
+                <Card card={exchange.pictureCard} trumpSuit={gameState.trumpSuit} />
+              </div>
+              <p>{et.bidding.selectCardToGive}</p>
+            </div>
+          </div>
+        )}
+
         {/* Center overlay for round end */}
         {gameState.phase === GAME_PHASES.ROUND_END && (
           <div className="center-overlay">
             <div className="round-end-content">
               {(() => {
-                // Check for Pokk (60-60 tie)
                 const isPokk = gameState.roundScores[0] === 60 && gameState.roundScores[1] === 60;
                 const buttonText = isPokk ? `${et.scoring.pokk} - ${et.scoring.nextRound}` : et.scoring.nextRound;
-
                 return (
                   <button className="next-round-button" onClick={handleNewRound}>
                     {buttonText}
@@ -356,30 +366,46 @@ export default function GameBoard({
             </div>
           </div>
         )}
-        {positions.map(({ index, className, name }) => {
+
+        {positions.map(({ index, position, name }) => {
           const card = getPlayerCard(index);
           const isCurrentPlayer = gameState.currentPlayer === index;
           const isWinner = showingLastTrick && index === trickWinner;
           const trumpIcon = getTrumpIcon(index);
+          const cardCount = gameState.hands[index].length;
 
           return (
-            <div key={index} className={`player-spot ${className} ${isCurrentPlayer ? 'active' : ''} ${isWinner ? 'winner' : ''}`}>
-              <div className="player-label">
-                {name}{getPlayerStatus(index)}
-                {trumpIcon && (
-                  <span className={`trump-icon trump-${gameState.trumpSuit}`}>
-                    {trumpIcon}
-                  </span>
-                )}
-              </div>
-              {card && (
-                <div className="player-card">
-                  <Card card={card} trumpSuit={gameState.trumpSuit} />
-                </div>
-              )}
-            </div>
+            <PlayerSpot
+              key={index}
+              position={position}
+              name={name}
+              cardCount={cardCount}
+              playedCard={card}
+              isCurrentPlayer={isCurrentPlayer}
+              isWinner={isWinner}
+              isPartner={index === myPartner}
+              trumpSuit={gameState.trumpSuit}
+              trumpIcon={trumpIcon}
+              isHuman={index === mySeat}
+              bidStatus={getPlayerStatus(index)}
+            />
           );
         })}
+
+        {/* Hand integrated into table bottom edge */}
+        <div className="player-hand-container">
+          <Hand
+            cards={gameState.hands[mySeat]}
+            onCardClick={handleCardPlay}
+            canPlay={gameState.phase === GAME_PHASES.PLAYING}
+            isCurrentPlayer={gameState.currentPlayer === mySeat}
+            hidden={false}
+            trumpSuit={gameState.trumpSuit}
+            canPlayCardFn={(card) => canPlayCard(gameState, mySeat, card)}
+            isBidding={gameState.phase === GAME_PHASES.BIDDING}
+            isExchanging={amExchangeResponder}
+          />
+        </div>
       </div>
     );
   };
@@ -410,16 +436,11 @@ export default function GameBoard({
   const renderRoomBanner = () => {
     if (!roomCode) return null;
 
-    // Show which networked seats are filled by humans (relative labels)
-    const seatLabel = (seat) => {
-      const pos = relPos(seat);
-      if (pos === 2) return et.lobby.seatPartner;
-      return et.lobby.seatOpponent;
-    };
+    const seatLabel = (seat) => (relPos(seat) === 2 ? et.lobby.seatPartner : et.lobby.seatOpponent);
 
     return (
       <div className="room-banner">
-        <span className="room-code-label">{et.lobby.roomCode}:</span>
+        <span className="room-code-label">{et.lobby.roomCode}</span>
         <span className="room-code-value">{roomCode}</span>
         <span className="room-players">
           {[2, 1, 3].map((seat) => (
@@ -435,27 +456,77 @@ export default function GameBoard({
     );
   };
 
+  const currentTrickPoints = calculateCurrentTrickPoints();
+  const showTrickPoints = gameState.phase === GAME_PHASES.PLAYING ||
+                          gameState.phase === GAME_PHASES.ROUND_END;
+
   return (
     <div className="game-board">
+      <header className="app-header">
+        <h1 className="app-title">{et.meta.title}</h1>
+        <div className="header-scores">
+          {showTrickPoints && (
+            <div className="header-score-block trick-points">
+              <span className="header-score-label">{et.scoring.trickPoints}</span>
+              <span className="header-score-pair">
+                <span className="header-score-team">{et.scoring.ourTeam}</span>
+                <span className="header-score-value">{currentTrickPoints[myTeam]}</span>
+                <span className="header-score-sep">·</span>
+                <span className="header-score-team">{et.scoring.theirTeam}</span>
+                <span className="header-score-value">{currentTrickPoints[oppTeam]}</span>
+              </span>
+            </div>
+          )}
+          <div className="header-score-block match-status">
+            <span className="header-score-label">{et.scoring.gameStatus}</span>
+            <span className="header-score-pair">
+              <span className="header-score-team">{et.scoring.ourTeam}</span>
+              <span className="header-score-value">
+                {gameState.gameScores[myTeam]}<span className="header-score-mini">|{gameState.matchWins[myTeam]}</span>
+              </span>
+              <span className="header-score-sep">·</span>
+              <span className="header-score-team">{et.scoring.theirTeam}</span>
+              <span className="header-score-value">
+                {gameState.gameScores[oppTeam]}<span className="header-score-mini">|{gameState.matchWins[oppTeam]}</span>
+              </span>
+            </span>
+          </div>
+        </div>
+        <div className="header-menu">
+          <button
+            className="settings-button"
+            aria-label={et.lobby.menu}
+            onClick={() => setMenuOpen(o => !o)}
+          >
+            ⚙
+          </button>
+          {menuOpen && (
+            <div className="settings-dropdown">
+              {onNewGame && (
+                <button
+                  className="settings-item"
+                  onClick={() => { setMenuOpen(false); onNewGame(); }}
+                >
+                  {et.gameEnd.newGame}
+                </button>
+              )}
+              {onLeaveToMenu && (
+                <button
+                  className="settings-item"
+                  onClick={() => { setMenuOpen(false); onLeaveToMenu(); }}
+                >
+                  {et.lobby.menu}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
       {renderRoomBanner()}
       {renderGameEnd()}
       {renderDealChoice()}
       {renderPackChoice()}
       {renderPlayArea()}
-
-      {/* Player's hand */}
-      <div className="player-hand-container">
-        <Hand
-          cards={gameState.hands[mySeat]}
-          onCardClick={handleCardPlay}
-          canPlay={gameState.phase === GAME_PHASES.PLAYING}
-          isCurrentPlayer={gameState.currentPlayer === mySeat}
-          hidden={false}
-          trumpSuit={gameState.trumpSuit}
-          canPlayCardFn={(card) => canPlayCard(gameState, mySeat, card)}
-          isBidding={gameState.phase === GAME_PHASES.BIDDING}
-        />
-      </div>
     </div>
   );
 }

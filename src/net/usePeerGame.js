@@ -13,7 +13,10 @@ import {
   chooseCardPack,
   startNewRound,
   startNewMatch,
-  quickRuutuBid
+  quickRuutuBid,
+  exchangePicture,
+  canExchangePicture,
+  getPartner
 } from '../game/gameState';
 import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
 
@@ -47,12 +50,29 @@ function loadSavedState() {
       const loadedState = JSON.parse(saved);
       if (!loadedState.matchWins) loadedState.matchWins = [0, 0];
       if (loadedState.pokkBonus === undefined) loadedState.pokkBonus = false;
+      if (!loadedState.hasExchangedPicture) loadedState.hasExchangedPicture = [false, false, false, false];
+      if (loadedState.pendingPictureExchange === undefined) loadedState.pendingPictureExchange = null;
       return loadedState;
     }
   } catch (error) {
     console.error('Failed to load game state:', error);
   }
   return null;
+}
+
+// Pick which card a partner gives back in a picture exchange: prefer a
+// singleton suit (to create a void for trumping), else the lowest-value card.
+function chooseGivebackCard(partnerHand) {
+  const suitCounts = {};
+  partnerHand.filter(c => !c.isPicture).forEach(c => {
+    suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+  });
+  let cardToGive = partnerHand.find(c => !c.isPicture && suitCounts[c.suit] === 1);
+  if (!cardToGive) {
+    const sortedByValue = [...partnerHand].filter(c => !c.isPicture).sort((a, b) => a.points - b.points);
+    cardToGive = sortedByValue[0];
+  }
+  return cardToGive;
 }
 
 // Apply a player's action to the game state. Pure and authoritative:
@@ -80,6 +100,26 @@ function applyAction(state, seat, action) {
     case 'ruutuBid':
       if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
       return quickRuutuBid(state, seat);
+
+    case 'initiateExchange': {
+      // A player offers their single picture to their partner.
+      if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
+      if (state.pendingPictureExchange) return state;
+      if (!canExchangePicture(state, seat)) return state;
+      const pictureCard = state.hands[seat].find(c => c.isPicture);
+      if (!pictureCard) return state;
+      return { ...state, pendingPictureExchange: { fromPlayer: seat, pictureCard } };
+    }
+
+    case 'exchangeGiveBack': {
+      // The partner responds by choosing a (non-picture) card to give back.
+      const pending = state.pendingPictureExchange;
+      if (!pending) return state;
+      if (seat !== getPartner(pending.fromPlayer)) return state;
+      if (!action.card || action.card.isPicture) return state;
+      if (!state.hands[seat].find(c => c.id === action.card.id)) return state;
+      return exchangePicture(state, pending.fromPlayer, pending.pictureCard, action.card);
+    }
 
     case 'trump':
       if (state.trumpMaker !== seat || state.trumpSuit) return state;
@@ -145,12 +185,33 @@ export function usePeerGame() {
     if (!isHost || !gameState) return;
 
     const humanSeats = mode === 'host' ? [0, ...connectedSeats] : [0];
+
+    // A picture exchange is pending: if the partner who must respond is an AI,
+    // let it pick a card to give back; otherwise wait for the human partner.
+    if (gameState.pendingPictureExchange) {
+      const responder = getPartner(gameState.pendingPictureExchange.fromPlayer);
+      if (humanSeats.includes(responder)) return;
+
+      const timer = setTimeout(() => {
+        setGameState((prev) => {
+          if (!prev || !prev.pendingPictureExchange) return prev;
+          const { fromPlayer, pictureCard } = prev.pendingPictureExchange;
+          const partner = getPartner(fromPlayer);
+          const give = chooseGivebackCard(prev.hands[partner]);
+          return give
+            ? exchangePicture(prev, fromPlayer, pictureCard, give)
+            : { ...prev, pendingPictureExchange: null };
+        });
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+
     const cp = gameState.currentPlayer;
     if (humanSeats.includes(cp)) return; // wait for a human action
 
-    // Skip phases with no AI decision to make
     const phase = gameState.phase;
     if (phase !== GAME_PHASES.DEAL_CHOICE &&
+        phase !== GAME_PHASES.PACK_CHOICE &&
         phase !== GAME_PHASES.BIDDING &&
         phase !== GAME_PHASES.PLAYING) {
       return;
@@ -159,18 +220,33 @@ export function usePeerGame() {
     const trickJustCompleted = gameState.lastTrick &&
       gameState.lastTrick.trick.length === 4 &&
       gameState.currentTrick.length === 0;
-    const delay = trickJustCompleted ? 2500 : 600;
+    const delay = trickJustCompleted ? 2000 : 250;
 
     const timer = setTimeout(() => {
       setGameState((prev) => {
-        if (!prev) return prev;
+        if (!prev || prev.pendingPictureExchange) return prev;
         const player = prev.currentPlayer;
         if (humanSeats.includes(player)) return prev;
 
         if (prev.phase === GAME_PHASES.DEAL_CHOICE) {
+          // 15% Pime Ruutu, 10% Valida, 75% Tõstan
+          const rand = Math.random();
+          if (rand < 0.15) return chooseDealOption(prev, DEAL_OPTIONS.PIME_RUUTU);
+          if (rand < 0.25) return chooseDealOption(prev, DEAL_OPTIONS.VALIDA);
           return chooseDealOption(prev, DEAL_OPTIONS.TOSTAN);
         }
+        if (prev.phase === GAME_PHASES.PACK_CHOICE) {
+          const packIndex = Math.floor(Math.random() * prev.cardPacks.length);
+          return chooseCardPack(prev, player, packIndex);
+        }
         if (prev.phase === GAME_PHASES.BIDDING) {
+          // Maybe initiate a picture exchange with the partner (70%)
+          if (canExchangePicture(prev, player) && Math.random() < 0.7) {
+            const pictureCard = prev.hands[player].find(c => c.isPicture);
+            if (pictureCard) {
+              return { ...prev, pendingPictureExchange: { fromPlayer: player, pictureCard } };
+            }
+          }
           if (prev.trumpMaker === player && !prev.trumpSuit) {
             return chooseTrump(prev, chooseAITrump(prev, player));
           }
@@ -179,7 +255,10 @@ export function usePeerGame() {
         }
         if (prev.phase === GAME_PHASES.PLAYING) {
           const card = chooseAICard(prev, player);
-          return card ? playCard(prev, player, card) : prev;
+          if (card) return playCard(prev, player, card);
+          // Fallback: play the first legal card if the AI returned nothing
+          const fallback = prev.hands[player].find(c => canPlayCard(prev, player, c));
+          return fallback ? playCard(prev, player, fallback) : prev;
         }
         return prev;
       });
@@ -192,6 +271,7 @@ export function usePeerGame() {
   useEffect(() => {
     if (!isHost || !gameState) return;
     if (gameState.phase !== GAME_PHASES.BIDDING) return;
+    if (gameState.pendingPictureExchange) return;
 
     const humanSeats = mode === 'host' ? [0, ...connectedSeats] : [0];
     const cp = gameState.currentPlayer;

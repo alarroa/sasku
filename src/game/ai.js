@@ -197,7 +197,10 @@ export function chooseAICard(state, playerIndex) {
   const hand = state.hands[playerIndex];
   const legalCards = hand.filter(card => canPlayCard(state, playerIndex, card));
 
-  if (legalCards.length === 0) return null;
+  if (legalCards.length === 0) {
+    console.error(`AI player ${playerIndex} has no legal cards!`, { hand, state });
+    return null;
+  }
   if (legalCards.length === 1) return legalCards[0];
 
   const isLeading = state.currentTrick.length === 0;
@@ -205,35 +208,53 @@ export function chooseAICard(state, playerIndex) {
   const playedCards = getPlayedCards(state);
 
   if (isLeading) {
-    return chooseLeadingCard(legalCards, hand, state, playedCards);
+    const card = chooseLeadingCard(legalCards, hand, state, playedCards);
+    if (!card) {
+      console.error(`chooseLeadingCard returned null for player ${playerIndex}`, { legalCards, hand, state });
+      return legalCards[0]; // Fallback to first legal card
+    }
+    return card;
   } else {
-    return chooseFollowingCard(legalCards, hand, state, playerIndex, team, playedCards);
+    const card = chooseFollowingCard(legalCards, hand, state, playerIndex, team, playedCards);
+    if (!card) {
+      console.error(`chooseFollowingCard returned null for player ${playerIndex}`, { legalCards, hand, state });
+      return legalCards[0]; // Fallback to first legal card
+    }
+    return card;
   }
 }
 
 function chooseLeadingCard(legalCards, hand, state, playedCards) {
   // Strategy when leading:
-  // 1. Lead Aces to clear them early and win tricks
+  // 1. Lead Aces to clear them early and win tricks (but NOT trump aces/tens)
   // 2. Lead from strongest suit
   // 3. Probe with low cards from weak suits
 
-  const aces = legalCards.filter(c => !c.isPicture && c.rank === RANKS.ACE);
-  if (aces.length > 0) {
+  const trumpSuit = state.trumpSuit;
+
+  // Find non-trump aces (avoid leading trump ace)
+  const nonTrumpAces = legalCards.filter(c =>
+    !c.isPicture && c.rank === RANKS.ACE && c.suit !== trumpSuit
+  );
+  if (nonTrumpAces.length > 0) {
     // Lead an Ace - choose from longest suit
     const suitCounts = {};
-    aces.forEach(ace => {
+    nonTrumpAces.forEach(ace => {
       const count = hand.filter(c => !c.isPicture && c.suit === ace.suit).length;
       suitCounts[ace.suit] = count;
     });
-    const bestAce = aces.reduce((best, ace) =>
+    const bestAce = nonTrumpAces.reduce((best, ace) =>
       suitCounts[ace.suit] > suitCounts[best.suit] ? ace : best
     );
     return bestAce;
   }
 
-  // Find strongest suit (most cards or high cards)
+  // Find strongest non-trump suit (avoid leading trump ten as well)
   const suitStrength = {};
   Object.values(SUITS).forEach(suit => {
+    // Skip trump suit for leading strategy
+    if (suit === trumpSuit) return;
+
     const suitCards = legalCards.filter(c => !c.isPicture && c.suit === suit);
     if (suitCards.length > 0) {
       let strength = suitCards.length;
@@ -255,7 +276,8 @@ function chooseLeadingCard(legalCards, hand, state, playedCards) {
     }
   }
 
-  // Fallback: play lowest card
+  // If no good non-trump lead, play lowest card (even if it's trump)
+  // This handles case where hand is mostly trump
   return legalCards[legalCards.length - 1];
 }
 
@@ -288,6 +310,28 @@ function chooseFollowingCard(legalCards, hand, state, playerIndex, team, playedC
   );
 
   if (winningCards.length > 0) {
+    // Calculate current trick value
+    const trickValue = state.currentTrick.reduce((sum, play) => sum + play.card.points, 0);
+
+    // If we're last to play, be strategic about winning
+    if (isLastToPlay) {
+      // Find the lowest winning card
+      const lowestWinningCard = winningCards[winningCards.length - 1];
+
+      // Check if the lowest winning card is too valuable for this trick
+      const isValuableCard = lowestWinningCard.rank === 'K' ||
+                            lowestWinningCard.rank === 'Q' ||
+                            (lowestWinningCard.suit === state.trumpSuit &&
+                             (lowestWinningCard.rank === RANKS.ACE || lowestWinningCard.rank === '10'));
+
+      // If trick has low value (<=11 points) and we'd need to use a valuable card, don't win it
+      if (trickValue <= 11 && isValuableCard) {
+        // Don't win - play lowest card instead
+        const sortedByPoints = [...legalCards].sort((a, b) => a.points - b.points);
+        return sortedByPoints[0];
+      }
+    }
+
     // We can win - use LOWEST winning card (don't waste high cards)
     return winningCards[winningCards.length - 1];
   }
