@@ -19,7 +19,7 @@ export function createInitialState() {
   return {
     phase: GAME_PHASES.DEAL_CHOICE,
     hands: [[], [], [], []],
-    currentPlayer: 0, // Player after dealer (dealer is 3)
+    currentPlayer: 2, // Deal option is chosen by the player BEFORE the dealer (dealer is 3)
     dealer: 3,
 
     // Deal choice state
@@ -66,6 +66,10 @@ export function getNextPlayer(currentPlayer) {
   return (currentPlayer + 1) % 4;
 }
 
+export function getPreviousPlayer(currentPlayer) {
+  return (currentPlayer + 3) % 4;
+}
+
 // Deal choice functions
 export function chooseDealOption(state, option) {
   const newState = { ...state };
@@ -101,6 +105,8 @@ export function chooseDealOption(state, option) {
     }
     newState.cardPacks = packs;
     newState.phase = GAME_PHASES.PACK_CHOICE;
+    // Pack picking starts from the player after the dealer
+    newState.currentPlayer = getNextPlayer(state.dealer);
   }
 
   return newState;
@@ -116,23 +122,18 @@ export function chooseCardPack(state, playerIndex, packIndex) {
   // Remove chosen pack from available packs
   const remainingPacks = state.cardPacks.filter((_, i) => i !== packIndex);
 
-  // Distribute remaining packs to other players in order
-  // Starting from next player after the chooser
-  const chooserPosition = (playerIndex - getNextPlayer(state.dealer) + 4) % 4;
-  const playerOrder = [];
+  // Picking goes around the table in turn order, starting from the player
+  // after the dealer. The next player picks from the remaining packs; once
+  // only one pack is left it goes automatically to the last player (dealer).
+  const nextPlayer = getNextPlayer(playerIndex);
 
-  for (let i = 0; i < 4; i++) {
-    if (i !== chooserPosition) {
-      const actualPlayer = (getNextPlayer(state.dealer) + i) % 4;
-      playerOrder.push(actualPlayer);
-    }
+  if (remainingPacks.length > 1) {
+    newState.cardPacks = remainingPacks;
+    newState.currentPlayer = nextPlayer;
+    return newState;
   }
 
-  playerOrder.forEach((player, index) => {
-    if (index < remainingPacks.length) {
-      newState.hands[player] = remainingPacks[index].cards;
-    }
-  });
+  newState.hands[nextPlayer] = remainingPacks[0].cards;
 
   // Move to bidding phase
   newState.phase = GAME_PHASES.BIDDING;
@@ -181,17 +182,15 @@ export function canMakeBid(state, playerIndex, bid) {
   return bid > currentHighBid;
 }
 
-export function makeBid(state, playerIndex, bid, isOmale = false) {
+export function makeBid(state, playerIndex, bid) {
   const newState = { ...state };
   newState.bids = [...state.bids];
   newState.bids[playerIndex] = bid;
   newState.lastBidder = playerIndex;
   newState.currentPlayer = getNextPlayer(playerIndex);
 
-  // If "Omale", reset passes to allow another round
-  if (isOmale) {
-    newState.hasPassed = [false, false, false, false];
-  }
+  // Note: an "Omale" bid does NOT reset passes — a player who has passed
+  // stays out of the bidding for the rest of the round.
 
   return newState;
 }
@@ -258,8 +257,13 @@ export function exchangePicture(state, playerIndex, pictureCard, partnerCard) {
 }
 
 export function canExchangePicture(state, playerIndex) {
-  // Can only exchange during bidding phase
+  // Can only exchange during the bidding phase, before bidding has concluded
   if (state.phase !== GAME_PHASES.BIDDING) return false;
+  if (state.trumpMaker !== null) return false;
+
+  // The exchange must happen before the player enters the bidding:
+  // once they have bid or passed, the window is closed
+  if (state.bids[playerIndex] !== null || state.hasPassed[playerIndex]) return false;
 
   // Can't exchange if already exchanged
   if (state.hasExchangedPicture && state.hasExchangedPicture[playerIndex]) return false;
@@ -623,7 +627,7 @@ export function startNewRound(state) {
   return {
     ...createInitialState(),
     dealer: newDealer,
-    currentPlayer: getNextPlayer(newDealer),
+    currentPlayer: getPreviousPlayer(newDealer), // deal option is chosen by the player before the dealer
     gameScores: state.gameScores,
     matchWins: state.matchWins,
     pokkBonus: state.pokkBonus,
@@ -637,7 +641,7 @@ export function startNewMatch(state) {
   return {
     ...createInitialState(),
     dealer: newDealer,
-    currentPlayer: getNextPlayer(newDealer),
+    currentPlayer: getPreviousPlayer(newDealer), // deal option is chosen by the player before the dealer
     matchWins: state.matchWins,
     phase: GAME_PHASES.DEAL_CHOICE
   };

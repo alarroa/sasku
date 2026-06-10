@@ -14,9 +14,8 @@ import { SUITS, SUIT_NAMES_ET, SUIT_SYMBOLS, calculateBiddingValue } from '../ga
 import { et } from '../i18n/et';
 import './GameBoard.css';
 
-// Names/positions indexed by position RELATIVE to the viewer:
+// Positions indexed by position RELATIVE to the viewer:
 // 0 = you (bottom), 1 = left opponent, 2 = partner (top), 3 = right opponent
-const RELATIVE_NAMES = [et.players.you, et.players.player2, et.players.partner, et.players.player4];
 const RELATIVE_POS = ['bottom', 'left', 'top', 'right'];
 
 // Remembers the name the player last used to join a networked game
@@ -45,6 +44,9 @@ export default function GameBoard({
   // Id of the completed trick that has been faded out. Comparing against the
   // current last-trick id avoids a second setState-in-effect to reset a flag.
   const [hiddenTrickId, setHiddenTrickId] = useState(null);
+  // Last-trick id for which the game-end modal has been revealed; until then
+  // the final trick stays visible on the table.
+  const [gameEndShownKey, setGameEndShownKey] = useState(null);
 
   // Fade out the just-completed trick a couple of seconds after it finishes
   useEffect(() => {
@@ -56,20 +58,38 @@ export default function GameBoard({
     return () => clearTimeout(timer);
   }, [gameState, hiddenTrickId]);
 
+  // When the game ends, keep showing the final trick for a moment before
+  // revealing the game-end modal.
+  useEffect(() => {
+    if (!gameState || gameState.phase !== GAME_PHASES.GAME_END) return;
+    const key = gameState.lastTrick
+      ? gameState.lastTrick.trick.map(p => p.card.id).join(',')
+      : 'no-trick';
+    if (key === gameEndShownKey) return;
+    const timer = setTimeout(() => setGameEndShownKey(key), 2500);
+    return () => clearTimeout(timer);
+  }, [gameState, gameEndShownKey]);
+
   if (!gameState) return null;
 
   const myTeam = getTeam(mySeat);
   const oppTeam = 1 - myTeam;
 
+  // The game-end modal is held back briefly so the final trick stays visible
+  const gameEndReady = gameState.phase === GAME_PHASES.GAME_END &&
+    gameEndShownKey === (gameState.lastTrick
+      ? gameState.lastTrick.trick.map(p => p.card.id).join(',')
+      : 'no-trick');
+
   // Position of an absolute seat relative to the viewer (0 = self, clockwise)
   const relPos = (seat) => (seat - mySeat + 4) % 4;
 
-  // Label for a seat: the viewer is always "you"; other seats use the joiner's
-  // custom name when known, otherwise the generic relative label.
+  // Label for a seat: the viewer is always "you"; other seats use the player's
+  // custom name when known, otherwise a seat-based name that is identical for
+  // every viewer (so two players never call the same AI by different names).
   const seatName = (seat) => {
-    const rp = relPos(seat);
-    if (rp === 0) return RELATIVE_NAMES[0];
-    return playerNames[seat] || RELATIVE_NAMES[rp];
+    if (seat === mySeat) return et.players.you;
+    return playerNames[seat] || et.players.seatNames[seat];
   };
 
   // Am I the partner who must choose a card to give back in a pending exchange?
@@ -78,7 +98,7 @@ export default function GameBoard({
 
   const handleDealChoice = (option) => dispatch({ type: 'dealChoice', option });
   const handlePackChoice = (packIndex) => dispatch({ type: 'packChoice', index: packIndex });
-  const handleBid = (bid) => dispatch({ type: 'bid', value: bid, omale: false });
+  const handleBid = (bid) => dispatch({ type: 'bid', value: bid });
   const handlePass = () => dispatch({ type: 'pass' });
   const handleRuutuBid = () => dispatch({ type: 'ruutuBid' });
   const handleTrumpChoice = (suit) => dispatch({ type: 'trump', suit });
@@ -122,7 +142,7 @@ export default function GameBoard({
 
   const handleOmale = () => {
     const currentHighBid = Math.max(0, ...gameState.bids.filter(b => b !== null));
-    dispatch({ type: 'bid', value: currentHighBid, omale: true });
+    dispatch({ type: 'bid', value: currentHighBid });
   };
 
   const handleCardPlay = (card) => {
@@ -356,7 +376,8 @@ export default function GameBoard({
   const renderPlayArea = () => {
     const shouldShow = gameState.phase === GAME_PHASES.BIDDING ||
                        gameState.phase === GAME_PHASES.PLAYING ||
-                       gameState.phase === GAME_PHASES.ROUND_END;
+                       gameState.phase === GAME_PHASES.ROUND_END ||
+                       (gameState.phase === GAME_PHASES.GAME_END && !gameEndReady);
 
     if (!shouldShow) return null;
 
@@ -386,6 +407,22 @@ export default function GameBoard({
           <div className="bottom-overlay">
             <div className="overlay-content">
               {renderTrumpChoice()}
+            </div>
+          </div>
+        )}
+
+        {/* Picture exchange is allowed as soon as cards are dealt, before the
+            player has bid — even when it is not their turn. On their own turn
+            the button is part of the bidding controls instead. */}
+        {gameState.phase === GAME_PHASES.BIDDING &&
+          !shouldShowBiddingControls() &&
+          !gameState.pendingPictureExchange &&
+          canExchangePicture(gameState, mySeat) && (
+          <div className="bottom-overlay">
+            <div className="overlay-content">
+              <button className="exchange-button" onClick={handleExchangePictureClick}>
+                {et.bidding.exchangePicture}
+              </button>
             </div>
           </div>
         )}
@@ -463,7 +500,7 @@ export default function GameBoard({
   };
 
   const renderGameEnd = () => {
-    if (gameState.phase !== GAME_PHASES.GAME_END) return null;
+    if (!gameEndReady) return null;
 
     const weWon = gameState.gameScores[myTeam] >= 16;
     const winner = weWon ? et.scoring.ourTeam : et.scoring.theirTeam;

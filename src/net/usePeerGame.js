@@ -91,7 +91,7 @@ function applyAction(state, seat, action) {
 
     case 'bid':
       if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
-      return makeBid(state, seat, action.value, action.omale === true);
+      return makeBid(state, seat, action.value);
 
     case 'pass':
       if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
@@ -102,8 +102,10 @@ function applyAction(state, seat, action) {
       return quickRuutuBid(state, seat);
 
     case 'initiateExchange': {
-      // A player offers their single picture to their partner.
-      if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
+      // A player offers their single picture to their partner. Allowed at any
+      // time during bidding (not just on the player's own turn), as long as
+      // the player themself has not yet bid or passed (canExchangePicture).
+      if (state.phase !== GAME_PHASES.BIDDING) return state;
       if (state.pendingPictureExchange) return state;
       if (!canExchangePicture(state, seat)) return state;
       const pictureCard = state.hands[seat].find(c => c.isPicture);
@@ -252,6 +254,10 @@ export function usePeerGame() {
           return chooseCardPack(prev, player, packIndex);
         }
         if (prev.phase === GAME_PHASES.BIDDING) {
+          // A player who has passed stays out: just pass through quickly
+          if (prev.hasPassed[player]) {
+            return passBid(prev, player);
+          }
           // Maybe initiate a picture exchange with the partner (70%)
           if (canExchangePicture(prev, player) && Math.random() < 0.7) {
             const pictureCard = prev.hands[player].find(c => c.isPicture);

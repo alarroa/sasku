@@ -13,12 +13,10 @@ export const et = {
     diamonds: 'Ruutu'
   },
 
-  // Player names
+  // Player names — seat-based so every viewer sees the same name for the same player
   players: {
     you: 'Sina',
-    player2: 'Mängija 2',
-    partner: 'Paariline',
-    player4: 'Mängija 4'
+    seatNames: ['Mängija 1', 'Mängija 2', 'Mängija 3', 'Mängija 4']
   },
 
   // Deal choice
