@@ -28,7 +28,8 @@ export const et = {
     pimeRuutuDesc: 'Ruutu trumbiks ilma kaarte nägemata (+2 punkti boonust)',
     valida: 'Anna valida',
     validaDesc: 'Vali endale kaardipakk',
-    choosePack: 'Vali kaardipakk:'
+    choosePack: 'Vali kaardipakk:',
+    packChooserTurn: (name) => `${name} valib pakki…`
   },
 
   // Game phases

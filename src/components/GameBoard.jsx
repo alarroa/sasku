@@ -193,23 +193,38 @@ export default function GameBoard({
   };
 
   const renderPackChoice = () => {
-    if (gameState.phase !== GAME_PHASES.PACK_CHOICE || gameState.currentPlayer !== mySeat) {
+    if (gameState.phase !== GAME_PHASES.PACK_CHOICE) {
       return null;
     }
+
+    const myTurn = gameState.currentPlayer === mySeat;
 
     return (
       <div className="center-overlay deal-choice-overlay">
         <div className="overlay-content">
-          <h3>{et.dealChoice.choosePack}</h3>
+          <h3>
+            {myTurn
+              ? et.dealChoice.choosePack
+              : et.dealChoice.packChooserTurn(seatName(gameState.currentPlayer))}
+          </h3>
           <div className="pack-choice-grid">
-            {gameState.cardPacks.map((pack, index) => (
-              <div key={index} className="pack-choice" onClick={() => handlePackChoice(index)}>
-                <div className="pack-cards">
-                  <Card card={pack.topCard} disabled={false} />
-                  <Card card={pack.bottomCard} disabled={false} />
+            {gameState.cardPacks.map((pack, index) => {
+              const taken = pack.takenBy !== null;
+              const clickable = myTurn && !taken;
+              return (
+                <div
+                  key={index}
+                  className={`pack-choice${taken ? ' pack-taken' : ''}${clickable ? ' pack-clickable' : ''}`}
+                  onClick={clickable ? () => handlePackChoice(index) : undefined}
+                >
+                  <div className="pack-cards">
+                    <Card card={pack.topCard} disabled={taken} />
+                    <Card card={pack.bottomCard} disabled={taken} />
+                  </div>
+                  {taken && <div className="pack-owner">{seatName(pack.takenBy)}</div>}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

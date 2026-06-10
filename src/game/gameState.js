@@ -100,7 +100,8 @@ export function chooseDealOption(state, option) {
       packs.push({
         cards: pack,
         topCard: pack[0],
-        bottomCard: pack[8]
+        bottomCard: pack[8],
+        takenBy: null
       });
     }
     newState.cardPacks = packs;
@@ -119,21 +120,31 @@ export function chooseCardPack(state, playerIndex, packIndex) {
   newState.hands = [...state.hands];
   newState.hands[playerIndex] = state.cardPacks[packIndex].cards;
 
-  // Remove chosen pack from available packs
-  const remainingPacks = state.cardPacks.filter((_, i) => i !== packIndex);
+  // Keep all four packs visible and mark who took which one, so every player
+  // can see how the choosing unfolds (taken packs become inactive).
+  newState.cardPacks = state.cardPacks.map((pack, i) =>
+    i === packIndex ? { ...pack, takenBy: playerIndex } : pack
+  );
 
   // Picking goes around the table in turn order, starting from the player
   // after the dealer. The next player picks from the remaining packs; once
   // only one pack is left it goes automatically to the last player (dealer).
+  const untakenIndexes = newState.cardPacks
+    .map((pack, i) => (pack.takenBy === null ? i : -1))
+    .filter(i => i !== -1);
   const nextPlayer = getNextPlayer(playerIndex);
 
-  if (remainingPacks.length > 1) {
-    newState.cardPacks = remainingPacks;
+  if (untakenIndexes.length > 1) {
     newState.currentPlayer = nextPlayer;
     return newState;
   }
 
-  newState.hands[nextPlayer] = remainingPacks[0].cards;
+  // Only one pack left: it goes automatically to the last player (dealer).
+  const lastPackIndex = untakenIndexes[0];
+  newState.hands[nextPlayer] = newState.cardPacks[lastPackIndex].cards;
+  newState.cardPacks = newState.cardPacks.map((pack, i) =>
+    i === lastPackIndex ? { ...pack, takenBy: nextPlayer } : pack
+  );
 
   // Move to bidding phase
   newState.phase = GAME_PHASES.BIDDING;

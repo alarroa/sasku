@@ -250,7 +250,10 @@ export function usePeerGame() {
           return chooseDealOption(prev, DEAL_OPTIONS.TOSTAN);
         }
         if (prev.phase === GAME_PHASES.PACK_CHOICE) {
-          const packIndex = Math.floor(Math.random() * prev.cardPacks.length);
+          const available = prev.cardPacks
+            .map((pack, i) => (pack.takenBy === null ? i : -1))
+            .filter(i => i !== -1);
+          const packIndex = available[Math.floor(Math.random() * available.length)];
           return chooseCardPack(prev, player, packIndex);
         }
         if (prev.phase === GAME_PHASES.BIDDING) {
