@@ -1,0 +1,691 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Peer from 'peerjs';
+import {
+  createInitialState,
+  GAME_PHASES,
+  DEAL_OPTIONS,
+  canPlayCard,
+  playCard,
+  makeBid,
+  passBid,
+  chooseTrump,
+  chooseDealOption,
+  chooseCardPack,
+  startNewRound,
+  startNewMatch,
+  quickRuutuBid,
+  exchangePicture,
+  canExchangePicture,
+  getPartner
+} from '../game/gameState';
+import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
+
+const STORAGE_KEY = 'sasku-game-state';      // single-player save
+const HOST_STATE_KEY = 'sasku-host-state';    // host's networked game save (survives refresh)
+const SESSION_KEY = 'sasku-mp-session';       // {role, code} — drives auto-resume
+const CLIENT_ID_KEY = 'sasku-client-id';      // stable per-device identity
+const ROOM_CODE_KEY = 'sasku-room-code';      // last room code (remembered / prefilled)
+const HOST_SEATS_KEY = 'sasku-host-seats';    // {clientId: seat} — restores seats after host refresh
+
+// Prefix to namespace our peer ids on the public PeerJS broker
+const CODE_PREFIX = 'sasku-';
+
+// Seat assignment order for joining players:
+// seat 0 = host, seat 2 = host's partner (first to join),
+// seats 1 & 3 = opponents (join afterwards). Empty seats are AI.
+const SEAT_ORDER = [2, 1, 3];
+
+// How long a seat is held for a disconnected human before an AI takes over.
+const DISCONNECT_GRACE_MS = 45000;
+
+// Modes: 'menu' | 'single' | 'host' | 'client'
+
+function safeGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeSet(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* ignore */ }
+}
+function safeRemove(key) {
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+}
+
+// A short, stable, human-friendly code. User codes are normalised to A–Z/0–9.
+export function normalizeCode(raw) {
+  return (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+}
+
+function makeRoomCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous 0/O/1/I
+  let code = '';
+  for (let i = 0; i < 4; i++) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return code;
+}
+
+function getClientId() {
+  let id = safeGet(CLIENT_ID_KEY);
+  if (!id) {
+    id = 'c-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+    safeSet(CLIENT_ID_KEY, id);
+  }
+  return id;
+}
+
+function loadSeatMap() {
+  try { return JSON.parse(safeGet(HOST_SEATS_KEY) || '{}'); } catch { return {}; }
+}
+function saveSeatMap(map) {
+  safeSet(HOST_SEATS_KEY, JSON.stringify(map));
+}
+function setSeatInMap(clientId, seat) {
+  saveSeatMap({ ...loadSeatMap(), [clientId]: seat });
+}
+function removeSeatFromMap(clientId) {
+  const next = { ...loadSeatMap() };
+  delete next[clientId];
+  saveSeatMap(next);
+}
+
+function loadSavedState(key) {
+  try {
+    const saved = safeGet(key);
+    if (saved) {
+      const s = JSON.parse(saved);
+      if (!s.matchWins) s.matchWins = [0, 0];
+      if (s.pokkBonus === undefined) s.pokkBonus = false;
+      if (!s.hasExchangedPicture) s.hasExchangedPicture = [false, false, false, false];
+      if (s.pendingPictureExchange === undefined) s.pendingPictureExchange = null;
+      return s;
+    }
+  } catch (error) {
+    console.error('Failed to load game state:', error);
+  }
+  return null;
+}
+
+// Pick which card a partner gives back in a picture exchange: prefer a
+// singleton suit (to create a void for trumping), else the lowest-value card.
+function chooseGivebackCard(partnerHand) {
+  const suitCounts = {};
+  partnerHand.filter(c => !c.isPicture).forEach(c => {
+    suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+  });
+  let cardToGive = partnerHand.find(c => !c.isPicture && suitCounts[c.suit] === 1);
+  if (!cardToGive) {
+    const sortedByValue = [...partnerHand].filter(c => !c.isPicture).sort((a, b) => a.points - b.points);
+    cardToGive = sortedByValue[0];
+  }
+  return cardToGive;
+}
+
+// Apply a player's action to the game state. Pure and authoritative:
+// guards ensure a player can only act on their own seat and turn.
+function applyAction(state, seat, action) {
+  if (!state || !action) return state;
+
+  switch (action.type) {
+    case 'dealChoice':
+      if (state.phase !== GAME_PHASES.DEAL_CHOICE || state.currentPlayer !== seat) return state;
+      return chooseDealOption(state, action.option);
+
+    case 'packChoice':
+      if (state.phase !== GAME_PHASES.PACK_CHOICE || state.currentPlayer !== seat) return state;
+      return chooseCardPack(state, seat, action.index);
+
+    case 'bid':
+      if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
+      return makeBid(state, seat, action.value, action.omale === true);
+
+    case 'pass':
+      if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
+      return passBid(state, seat);
+
+    case 'ruutuBid':
+      if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
+      return quickRuutuBid(state, seat);
+
+    case 'initiateExchange': {
+      if (state.phase !== GAME_PHASES.BIDDING || state.currentPlayer !== seat) return state;
+      if (state.pendingPictureExchange) return state;
+      if (!canExchangePicture(state, seat)) return state;
+      const pictureCard = state.hands[seat].find(c => c.isPicture);
+      if (!pictureCard) return state;
+      return { ...state, pendingPictureExchange: { fromPlayer: seat, pictureCard } };
+    }
+
+    case 'exchangeGiveBack': {
+      const pending = state.pendingPictureExchange;
+      if (!pending) return state;
+      if (seat !== getPartner(pending.fromPlayer)) return state;
+      if (!action.card || action.card.isPicture) return state;
+      if (!state.hands[seat].find(c => c.id === action.card.id)) return state;
+      return exchangePicture(state, pending.fromPlayer, pending.pictureCard, action.card);
+    }
+
+    case 'trump':
+      if (state.trumpMaker !== seat || state.trumpSuit) return state;
+      return chooseTrump(state, action.suit);
+
+    case 'playCard':
+      if (state.phase !== GAME_PHASES.PLAYING || state.currentPlayer !== seat) return state;
+      if (!canPlayCard(state, seat, action.card)) return state;
+      return playCard(state, seat, action.card);
+
+    case 'newRound':
+      if (state.phase !== GAME_PHASES.ROUND_END) return state;
+      return startNewRound(state);
+
+    case 'newMatch':
+      if (state.phase !== GAME_PHASES.GAME_END) return state;
+      return startNewMatch(state);
+
+    default:
+      return state;
+  }
+}
+
+export function usePeerGame() {
+  const [mode, setMode] = useState('menu');
+  const [gameState, setGameState] = useState(null);
+  const [mySeat, setMySeat] = useState(0);
+  const [roomCode, setRoomCode] = useState(null);
+  const [connectedSeats, setConnectedSeats] = useState([]); // seats with a live connection
+  const [heldSeats, setHeldSeats] = useState([]);           // seats held during disconnect grace
+  const [status, setStatus] = useState(null);
+  const [savedCode, setSavedCode] = useState(safeGet(ROOM_CODE_KEY) || '');
+
+  const peerRef = useRef(null);
+  // host: seat -> { conn: DataConnection|null, clientId }
+  const seatsRef = useRef(new Map());
+  const graceRef = useRef(new Map()); // seat -> grace timeout id
+  const hostConnRef = useRef(null);   // client: connection to host
+  const gameStateRef = useRef(null);
+  const modeRef = useRef('menu');
+  const manualLeaveRef = useRef(false);
+  const clientReconnectRef = useRef(null); // client: reconnect timeout id
+  const savedCodeRef = useRef(safeGet(ROOM_CODE_KEY) || '');
+
+  const isHost = mode === 'single' || mode === 'host';
+
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  const syncSeatStates = useCallback(() => {
+    const connected = [];
+    const held = [];
+    seatsRef.current.forEach((meta, seat) => {
+      if (meta.conn) connected.push(seat);
+      else held.push(seat);
+    });
+    setConnectedSeats(connected);
+    setHeldSeats(held);
+  }, []);
+
+  // Persist single-player OR host networked game so a refresh can resume it
+  useEffect(() => {
+    if (!gameState) return;
+    if (mode === 'single') safeSet(STORAGE_KEY, JSON.stringify(gameState));
+    else if (mode === 'host') safeSet(HOST_STATE_KEY, JSON.stringify(gameState));
+  }, [gameState, mode]);
+
+  // Host: broadcast authoritative state to all live clients on every change
+  useEffect(() => {
+    if (mode !== 'host' || !gameState) return;
+    seatsRef.current.forEach((meta) => {
+      if (meta.conn && meta.conn.open) meta.conn.send({ type: 'state', gameState });
+    });
+  }, [gameState, mode]);
+
+  // Host: drive AI for any seat not occupied by a human (connected or held)
+  useEffect(() => {
+    if (!isHost || !gameState) return;
+
+    const humanSeats = mode === 'host' ? [0, ...connectedSeats, ...heldSeats] : [0];
+
+    // A picture exchange is pending: if the responding partner is an AI, let
+    // it choose a give-back card; otherwise wait for the human partner.
+    if (gameState.pendingPictureExchange) {
+      const responder = getPartner(gameState.pendingPictureExchange.fromPlayer);
+      if (humanSeats.includes(responder)) return;
+      const timer = setTimeout(() => {
+        setGameState((prev) => {
+          if (!prev || !prev.pendingPictureExchange) return prev;
+          const { fromPlayer, pictureCard } = prev.pendingPictureExchange;
+          const partner = getPartner(fromPlayer);
+          const give = chooseGivebackCard(prev.hands[partner]);
+          return give
+            ? exchangePicture(prev, fromPlayer, pictureCard, give)
+            : { ...prev, pendingPictureExchange: null };
+        });
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+
+    const cp = gameState.currentPlayer;
+    if (humanSeats.includes(cp)) return; // wait for a human (possibly reconnecting)
+
+    const phase = gameState.phase;
+    if (phase !== GAME_PHASES.DEAL_CHOICE &&
+        phase !== GAME_PHASES.PACK_CHOICE &&
+        phase !== GAME_PHASES.BIDDING &&
+        phase !== GAME_PHASES.PLAYING) {
+      return;
+    }
+
+    const trickJustCompleted = gameState.lastTrick &&
+      gameState.lastTrick.trick.length === 4 &&
+      gameState.currentTrick.length === 0;
+    const delay = trickJustCompleted ? 2000 : 250;
+
+    const timer = setTimeout(() => {
+      setGameState((prev) => {
+        if (!prev || prev.pendingPictureExchange) return prev;
+        const player = prev.currentPlayer;
+        if (humanSeats.includes(player)) return prev;
+
+        if (prev.phase === GAME_PHASES.DEAL_CHOICE) {
+          const rand = Math.random();
+          if (rand < 0.15) return chooseDealOption(prev, DEAL_OPTIONS.PIME_RUUTU);
+          if (rand < 0.25) return chooseDealOption(prev, DEAL_OPTIONS.VALIDA);
+          return chooseDealOption(prev, DEAL_OPTIONS.TOSTAN);
+        }
+        if (prev.phase === GAME_PHASES.PACK_CHOICE) {
+          const packIndex = Math.floor(Math.random() * prev.cardPacks.length);
+          return chooseCardPack(prev, player, packIndex);
+        }
+        if (prev.phase === GAME_PHASES.BIDDING) {
+          if (canExchangePicture(prev, player) && Math.random() < 0.7) {
+            const pictureCard = prev.hands[player].find(c => c.isPicture);
+            if (pictureCard) {
+              return { ...prev, pendingPictureExchange: { fromPlayer: player, pictureCard } };
+            }
+          }
+          if (prev.trumpMaker === player && !prev.trumpSuit) {
+            return chooseTrump(prev, chooseAITrump(prev, player));
+          }
+          const bid = makeAIBid(prev, player);
+          return bid !== null ? makeBid(prev, player, bid) : passBid(prev, player);
+        }
+        if (prev.phase === GAME_PHASES.PLAYING) {
+          const card = chooseAICard(prev, player);
+          if (card) return playCard(prev, player, card);
+          const fallback = prev.hands[player].find(c => canPlayCard(prev, player, c));
+          return fallback ? playCard(prev, player, fallback) : prev;
+        }
+        return prev;
+      });
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [gameState, isHost, mode, connectedSeats, heldSeats]);
+
+  // Host: auto-pass a human seat that already passed during bidding
+  useEffect(() => {
+    if (!isHost || !gameState) return;
+    if (gameState.phase !== GAME_PHASES.BIDDING || gameState.pendingPictureExchange) return;
+
+    const humanSeats = mode === 'host' ? [0, ...connectedSeats, ...heldSeats] : [0];
+    const cp = gameState.currentPlayer;
+    if (!humanSeats.includes(cp) || !gameState.hasPassed[cp]) return;
+
+    const timer = setTimeout(() => {
+      setGameState((prev) => {
+        if (!prev || prev.phase !== GAME_PHASES.BIDDING) return prev;
+        if (!prev.hasPassed[prev.currentPlayer]) return prev;
+        return passBid(prev, prev.currentPlayer);
+      });
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [gameState, isHost, mode, connectedSeats, heldSeats]);
+
+  const clearGraceTimers = useCallback(() => {
+    graceRef.current.forEach((t) => clearTimeout(t));
+    graceRef.current.clear();
+  }, []);
+
+  const cleanupPeer = useCallback(() => {
+    if (clientReconnectRef.current) { clearTimeout(clientReconnectRef.current); clientReconnectRef.current = null; }
+    clearGraceTimers();
+    seatsRef.current.forEach((meta) => {
+      if (meta.conn) { try { meta.conn.close(); } catch { /* ignore */ } }
+    });
+    seatsRef.current.clear();
+    if (hostConnRef.current) {
+      try { hostConnRef.current.close(); } catch { /* ignore */ }
+      hostConnRef.current = null;
+    }
+    if (peerRef.current) {
+      try { peerRef.current.destroy(); } catch { /* ignore */ }
+      peerRef.current = null;
+    }
+  }, [clearGraceTimers]);
+
+  const dispatch = useCallback((action) => {
+    if (isHost) {
+      setGameState((prev) => applyAction(prev, 0, action)); // host's local human = seat 0
+    } else if (hostConnRef.current && hostConnRef.current.open) {
+      hostConnRef.current.send({ type: 'action', action });
+    }
+  }, [isHost]);
+
+  // ---- Host ----------------------------------------------------------------
+
+  const assignSeat = useCallback((clientId) => {
+    // Already seated in this session? Reuse.
+    for (const [seat, meta] of seatsRef.current) {
+      if (meta.clientId === clientId) return seat;
+    }
+    const map = loadSeatMap();
+    // Reclaim a persisted seat (e.g. after a host refresh) if still free
+    if (map[clientId] !== undefined && !seatsRef.current.has(map[clientId])) {
+      return map[clientId];
+    }
+    const used = new Set([...seatsRef.current.keys(), ...Object.values(map)]);
+    const seat = SEAT_ORDER.find((s) => !used.has(s));
+    if (seat !== undefined) setSeatInMap(clientId, seat);
+    return seat;
+  }, []);
+
+  const handleHostConnection = useCallback((conn) => {
+    conn.on('open', () => {
+      const clientId = (conn.metadata && conn.metadata.clientId) || ('anon-' + conn.peer);
+      const seat = assignSeat(clientId);
+
+      if (seat === undefined) {
+        conn.send({ type: 'full' });
+        setTimeout(() => { try { conn.close(); } catch { /* ignore */ } }, 200);
+        return;
+      }
+
+      // Cancel any pending grace timer — the player is back
+      if (graceRef.current.has(seat)) {
+        clearTimeout(graceRef.current.get(seat));
+        graceRef.current.delete(seat);
+      }
+      // Close a stale connection lingering on this seat
+      const existing = seatsRef.current.get(seat);
+      if (existing && existing.conn && existing.conn !== conn) {
+        try { existing.conn.close(); } catch { /* ignore */ }
+      }
+
+      seatsRef.current.set(seat, { conn, clientId });
+      syncSeatStates();
+
+      conn.send({ type: 'welcome', seat });
+      conn.send({ type: 'state', gameState: gameStateRef.current });
+
+      conn.on('data', (data) => {
+        if (data && data.type === 'action') {
+          setGameState((prev) => applyAction(prev, seat, data.action));
+        }
+      });
+
+      conn.on('close', () => {
+        const meta = seatsRef.current.get(seat);
+        if (!meta || meta.conn !== conn) return; // superseded by a newer connection
+        // Hold the seat briefly so a refresh/app-switch can reclaim it
+        seatsRef.current.set(seat, { conn: null, clientId });
+        syncSeatStates();
+        const t = setTimeout(() => {
+          seatsRef.current.delete(seat);
+          graceRef.current.delete(seat);
+          removeSeatFromMap(clientId);
+          syncSeatStates();
+        }, DISCONNECT_GRACE_MS);
+        graceRef.current.set(seat, t);
+      });
+    });
+  }, [assignSeat, syncSeatStates]);
+
+  const createGame = useCallback((requestedCode, { resume = false } = {}) => {
+    cleanupPeer();
+    manualLeaveRef.current = false;
+    setStatus('connecting');
+    setConnectedSeats([]);
+    setHeldSeats([]);
+
+    const normalized = normalizeCode(requestedCode);
+    // A user/resume code is fixed (retry the same id); an auto code can change on collision.
+    const fixedCode = normalized || (resume ? normalizeCode(savedCodeRef.current) : '');
+    let attempts = 0;
+
+    const attempt = (code) => {
+      const peer = new Peer(CODE_PREFIX + code);
+      peerRef.current = peer;
+
+      peer.on('open', () => {
+        setRoomCode(code);
+        setMySeat(0);
+        setMode('host');
+        setStatus('ready');
+        savedCodeRef.current = code;
+        setSavedCode(code);
+        safeSet(ROOM_CODE_KEY, code);
+        safeSet(SESSION_KEY, JSON.stringify({ role: 'host', code }));
+
+        if (resume) {
+          setGameState(loadSavedState(HOST_STATE_KEY) || createInitialState());
+          // Give previously-seated players a grace window to reconnect
+          const map = loadSeatMap();
+          Object.entries(map).forEach(([clientId, seat]) => {
+            if (seatsRef.current.has(seat)) return;
+            seatsRef.current.set(seat, { conn: null, clientId });
+            const t = setTimeout(() => {
+              seatsRef.current.delete(seat);
+              graceRef.current.delete(seat);
+              removeSeatFromMap(clientId);
+              syncSeatStates();
+            }, DISCONNECT_GRACE_MS);
+            graceRef.current.set(seat, t);
+          });
+          syncSeatStates();
+        } else {
+          saveSeatMap({}); // fresh room — clear old seat reservations
+          setGameState(createInitialState());
+        }
+      });
+
+      peer.on('error', (err) => {
+        if (err && err.type === 'unavailable-id') {
+          attempts += 1;
+          try { peer.destroy(); } catch { /* ignore */ }
+          if (fixedCode && attempts <= 5) {
+            // Broker still holds our previous id — wait for it to expire, keep the code
+            clientReconnectRef.current = setTimeout(() => attempt(fixedCode), 1500);
+          } else {
+            attempt(makeRoomCode());
+          }
+          return;
+        }
+        console.error('Peer error:', err);
+        setStatus('error');
+      });
+
+      peer.on('disconnected', () => {
+        // Lost the broker connection — reconnect so new clients can still join
+        if (!manualLeaveRef.current && peerRef.current === peer && !peer.destroyed) {
+          try { peer.reconnect(); } catch { /* ignore */ }
+        }
+      });
+
+      peer.on('connection', handleHostConnection);
+    };
+
+    attempt(fixedCode || makeRoomCode());
+  }, [cleanupPeer, handleHostConnection, syncSeatStates]);
+
+  // ---- Client --------------------------------------------------------------
+
+  const joinGame = useCallback((requestedCode) => {
+    const code = normalizeCode(requestedCode) || normalizeCode(savedCodeRef.current);
+    if (!code) return;
+
+    cleanupPeer();
+    manualLeaveRef.current = false;
+    const clientId = getClientId();
+
+    const openConnection = (isRetry) => {
+      setStatus(isRetry ? 'reconnecting' : 'connecting');
+      const peer = new Peer();
+      peerRef.current = peer;
+
+      const scheduleRetry = () => {
+        if (manualLeaveRef.current) return;
+        if (modeRef.current !== 'client' && modeRef.current !== 'menu') return;
+        if (clientReconnectRef.current) clearTimeout(clientReconnectRef.current);
+        setStatus('reconnecting');
+        clientReconnectRef.current = setTimeout(() => {
+          if (manualLeaveRef.current) return;
+          try { peer.destroy(); } catch { /* ignore */ }
+          openConnection(true);
+        }, 2500);
+      };
+
+      peer.on('open', () => {
+        const conn = peer.connect(CODE_PREFIX + code, { reliable: true, metadata: { clientId } });
+        hostConnRef.current = conn;
+
+        conn.on('open', () => setStatus('connected'));
+
+        conn.on('data', (data) => {
+          if (!data) return;
+          if (data.type === 'welcome') {
+            setMySeat(data.seat);
+            setRoomCode(code);
+            setMode('client');
+            setStatus('connected');
+            savedCodeRef.current = code;
+            setSavedCode(code);
+            safeSet(ROOM_CODE_KEY, code);
+            safeSet(SESSION_KEY, JSON.stringify({ role: 'client', code }));
+          } else if (data.type === 'state') {
+            setGameState(data.gameState);
+          } else if (data.type === 'full') {
+            setStatus('full');
+            manualLeaveRef.current = true; // don't hammer a full room
+          }
+        });
+
+        conn.on('close', scheduleRetry);
+        conn.on('error', (err) => { console.error('Connection error:', err); scheduleRetry(); });
+      });
+
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        // Host not (yet) reachable — keep retrying rather than giving up
+        if (err && err.type === 'peer-unavailable') {
+          setStatus(modeRef.current === 'client' ? 'reconnecting' : 'notfound');
+          scheduleRetry();
+        } else {
+          scheduleRetry();
+        }
+      });
+
+      peer.on('disconnected', () => {
+        if (!manualLeaveRef.current && peerRef.current === peer && !peer.destroyed) {
+          try { peer.reconnect(); } catch { /* ignore */ }
+        }
+      });
+    };
+
+    openConnection(false);
+  }, [cleanupPeer]);
+
+  // ---- Menu / lifecycle ----------------------------------------------------
+
+  const startSingle = useCallback(() => {
+    cleanupPeer();
+    manualLeaveRef.current = true;
+    safeRemove(SESSION_KEY);
+    setMode('single');
+    setMySeat(0);
+    setConnectedSeats([]);
+    setHeldSeats([]);
+    setRoomCode(null);
+    setStatus(null);
+    setGameState(loadSavedState(STORAGE_KEY) || createInitialState());
+  }, [cleanupPeer]);
+
+  const resetGame = useCallback(() => {
+    if (!isHost) return;
+    if (mode === 'single') safeRemove(STORAGE_KEY);
+    else safeRemove(HOST_STATE_KEY);
+    setGameState(createInitialState());
+  }, [isHost, mode]);
+
+  const leaveToMenu = useCallback(() => {
+    manualLeaveRef.current = true;
+    cleanupPeer();
+    safeRemove(SESSION_KEY);
+    safeRemove(HOST_STATE_KEY);
+    saveSeatMap({});
+    setMode('menu');
+    setGameState(null);
+    setMySeat(0);
+    setConnectedSeats([]);
+    setHeldSeats([]);
+    setRoomCode(null);
+    setStatus(null);
+  }, [cleanupPeer]);
+
+  // Auto-resume a networked session after a refresh / app restart.
+  // Deferred to a timer so the connection kicks off just after mount; guarded
+  // by mode/peer so it fires once and survives StrictMode's double-mount.
+  useEffect(() => {
+    if (modeRef.current !== 'menu' || peerRef.current) return;
+    let session = null;
+    try { session = JSON.parse(safeGet(SESSION_KEY) || 'null'); } catch { session = null; }
+    if (!session || !session.code) return;
+    const t = setTimeout(() => {
+      if (peerRef.current) return; // a connection is already in flight
+      if (session.role === 'host') createGame(session.code, { resume: true });
+      else if (session.role === 'client') joinGame(session.code);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [createGame, joinGame]);
+
+  // When the tab becomes visible again (returning from another app), make sure
+  // the client connection is alive; nudge a reconnect if it dropped.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (manualLeaveRef.current) return;
+      const peer = peerRef.current;
+      if (peer && peer.disconnected && !peer.destroyed) {
+        try { peer.reconnect(); } catch { /* ignore */ }
+      }
+      if (modeRef.current === 'client' &&
+          (!hostConnRef.current || !hostConnRef.current.open) &&
+          !clientReconnectRef.current) {
+        const code = normalizeCode(savedCodeRef.current);
+        if (code) joinGame(code);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [joinGame]);
+
+  // Clean up on unmount
+  useEffect(() => cleanupPeer, [cleanupPeer]);
+
+  return {
+    mode,
+    isHost,
+    gameState,
+    mySeat,
+    roomCode,
+    connectedSeats,
+    heldSeats,
+    status,
+    savedCode,
+    dispatch,
+    startSingle,
+    createGame,
+    joinGame,
+    resetGame,
+    leaveToMenu
+  };
+}

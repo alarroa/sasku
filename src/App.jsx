@@ -1,33 +1,54 @@
-import { useState } from 'react'
 import GameBoard from './components/GameBoard'
+import Lobby from './components/Lobby'
+import { usePeerGame } from './net/usePeerGame'
 import { et } from './i18n/et'
 import './App.css'
 
-const STORAGE_KEY = 'sasku-game-state'
-
 function App() {
-  const [resetKey, setResetKey] = useState(0)
+  const game = usePeerGame()
 
-  const handleNewGame = () => {
-    // Clear localStorage
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch (error) {
-      console.error('Failed to clear game state:', error)
-    }
-    // Force GameBoard to remount with fresh state
-    setResetKey(prev => prev + 1)
+  // Menu
+  if (game.mode === 'menu') {
+    return (
+      <div className="app">
+        <Lobby
+          onSingle={game.startSingle}
+          onHost={game.createGame}
+          onJoin={game.joinGame}
+          status={game.status}
+          savedCode={game.savedCode}
+        />
+      </div>
+    )
+  }
+
+  // Connecting / reconnecting (no game state yet — e.g. client awaiting host)
+  if (!game.gameState) {
+    const label = game.status === 'reconnecting' ? et.lobby.reconnecting : et.lobby.connecting
+    return (
+      <div className="app">
+        <div className="connecting-screen">
+          <div className="connecting-spinner" aria-hidden="true" />
+          <p>{label}{game.roomCode ? ` — ${game.roomCode}` : ''}</p>
+          <button className="lobby-button" onClick={game.leaveToMenu}>{et.lobby.menu}</button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="app">
-      <header className="app-header">
-        <button className="new-game-button" onClick={handleNewGame}>
-          {et.gameEnd.newGame}
-        </button>
-        <h1>{et.meta.title}</h1>
-      </header>
-      <GameBoard key={resetKey} />
+      <GameBoard
+        gameState={game.gameState}
+        mySeat={game.mySeat}
+        dispatch={game.dispatch}
+        roomCode={game.mode === 'host' ? game.roomCode : null}
+        connectedSeats={game.connectedSeats}
+        heldSeats={game.heldSeats}
+        status={game.status}
+        onNewGame={game.isHost ? game.resetGame : undefined}
+        onLeaveToMenu={game.leaveToMenu}
+      />
     </div>
   )
 }

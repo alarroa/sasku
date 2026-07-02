@@ -31,6 +31,7 @@ export function createInitialState() {
     // Bidding state
     bids: [null, null, null, null],
     hasPassed: [false, false, false, false],
+    hasExchangedPicture: [false, false, false, false], // Track if player exchanged picture with partner
     lastBidder: null,
     trumpSuit: null,
     trumpMaker: null,
@@ -44,6 +45,9 @@ export function createInitialState() {
     roundScores: [0, 0], // Team 0 (players 0&2) vs Team 1 (players 1&3)
     gameScores: [0, 0],
     matchWins: [0, 0], // Track match wins across multiple games
+
+    // Pending picture exchange initiated by AI partner, awaiting human's choice of card to give back
+    pendingPictureExchange: null,
 
     // History
     lastTrick: null
@@ -209,15 +213,79 @@ export function passBid(state, playerIndex) {
     newState.leadPlayer = getNextPlayer(newState.dealer);
     newState.currentPlayer = newState.leadPlayer;
   }
-  // Three passed - winner determined
+  // Three passed - winner determined only if someone has actually bid
   else if (passCount === 3) {
     const winnerIndex = newState.bids.findIndex((bid, i) => bid !== null && !newState.hasPassed[i]);
-    newState.trumpMaker = winnerIndex;
-    newState.currentPlayer = winnerIndex;
-    // Trump will be chosen by AI or shown to human
-    // For now, stay in BIDDING phase until trump is chosen
-    // Or automatically choose for AI
+    if (winnerIndex !== -1) {
+      newState.trumpMaker = winnerIndex;
+      newState.currentPlayer = winnerIndex;
+    }
+    // else: no one has bid yet — let the 4th player take their turn
+    // (currentPlayer was already advanced above; if they also pass, passCount===4 triggers üleküla ruutu)
   }
+
+  return newState;
+}
+
+export function exchangePicture(state, playerIndex, pictureCard, partnerCard) {
+  const newState = { ...state };
+  const partnerIndex = getPartner(playerIndex);
+
+  // Copy hands
+  newState.hands = state.hands.map(hand => [...hand]);
+
+  // Remove picture from player's hand
+  newState.hands[playerIndex] = newState.hands[playerIndex].filter(c => c.id !== pictureCard.id);
+
+  // Remove partner's card from partner's hand
+  newState.hands[partnerIndex] = newState.hands[partnerIndex].filter(c => c.id !== partnerCard.id);
+
+  // Add picture to partner's hand
+  newState.hands[partnerIndex].push(pictureCard);
+
+  // Add partner's card to player's hand
+  newState.hands[playerIndex].push(partnerCard);
+
+  // Mark that this player has exchanged
+  newState.hasExchangedPicture = [...state.hasExchangedPicture];
+  newState.hasExchangedPicture[playerIndex] = true;
+  newState.hasExchangedPicture[partnerIndex] = true; // Partner also can't exchange now
+
+  // Clear any pending exchange request
+  newState.pendingPictureExchange = null;
+
+  return newState;
+}
+
+export function canExchangePicture(state, playerIndex) {
+  // Can only exchange during bidding phase
+  if (state.phase !== GAME_PHASES.BIDDING) return false;
+
+  // Can't exchange if already exchanged
+  if (state.hasExchangedPicture && state.hasExchangedPicture[playerIndex]) return false;
+
+  // Must have exactly 1 picture card
+  const hand = state.hands[playerIndex];
+  if (!hand) return false;
+
+  const pictures = hand.filter(c => c.isPicture);
+
+  return pictures.length === 1;
+}
+
+// Quick "Ruutu" bid: bid the minimum and immediately set diamonds as trump
+export function quickRuutuBid(state, playerIndex) {
+  const currentHighBid = Math.max(0, ...state.bids.filter(b => b !== null));
+  const newBid = Math.max(5, currentHighBid + 1);
+
+  const newState = { ...state };
+  newState.bids = [...state.bids];
+  newState.bids[playerIndex] = newBid;
+  newState.trumpMaker = playerIndex;
+  newState.trumpSuit = SUITS.DIAMONDS;
+  newState.phase = GAME_PHASES.PLAYING;
+  newState.leadPlayer = getNextPlayer(newState.dealer);
+  newState.currentPlayer = newState.leadPlayer;
 
   return newState;
 }
