@@ -1287,3 +1287,23 @@
         font-size: 15px;
     }
 }
+
+/* Multiplayer: held (reconnecting) seat + host code hint */
+.room-seat.held {
+    background: rgba(210, 150, 40, 0.9);
+    color: #1a1206;
+    font-weight: 700;
+}
+
+.settings-code-hint {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--ink-soft);
+    opacity: 0.85;
+}
+
+.connection-toast.reconnecting {
+    background: var(--gold-dim);
+}
