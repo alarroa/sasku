@@ -11,6 +11,7 @@ import {
   canExchangePicture
 } from '../game/gameState';
 import { SUITS, SUIT_NAMES_ET, SUIT_SYMBOLS, calculateBiddingValue } from '../game/cards';
+import { normalizeCode } from '../net/usePeerGame';
 import { et } from '../i18n/et';
 import './GameBoard.css';
 
@@ -28,16 +29,19 @@ export default function GameBoard({
   mode = 'single',
   roomCode = null,
   connectedSeats = [],
+  heldSeats = [],
   playerNames = [],
   status = null,
+  savedCode = '',
   onNewGame,
   onCreateGame,
   onJoinGame,
   onLeaveNetwork
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuView, setMenuView] = useState('main'); // 'main' | 'join'
+  const [menuView, setMenuView] = useState('main'); // 'main' | 'create' | 'join'
   const [joinCode, setJoinCode] = useState('');
+  const [hostCode, setHostCode] = useState(normalizeCode(savedCode));
   const [joinName, setJoinName] = useState(() => {
     try { return localStorage.getItem(NAME_STORAGE_KEY) || ''; } catch { return ''; }
   });
@@ -114,13 +118,13 @@ export default function GameBoard({
     const name = joinName.trim().slice(0, 12);
     try { localStorage.setItem(NAME_STORAGE_KEY, name); } catch { /* ignore */ }
     closeMenu();
-    onCreateGame(name);
+    onCreateGame(name, normalizeCode(hostCode)); // empty code -> hook generates one
   };
 
   const handleJoinSubmit = (e) => {
     e.preventDefault();
-    const code = joinCode.replace(/\D/g, '');
-    if (code.length !== 4 || !onJoinGame) return;
+    const code = normalizeCode(joinCode);
+    if (code.length < 3 || !onJoinGame) return;
     const name = joinName.trim().slice(0, 12);
     try { localStorage.setItem(NAME_STORAGE_KEY, name); } catch { /* ignore */ }
     closeMenu();
@@ -131,6 +135,7 @@ export default function GameBoard({
   const connectionMessage = () => {
     switch (status) {
       case 'connecting': return et.lobby.connecting;
+      case 'reconnecting': return et.lobby.reconnecting;
       case 'error': return et.lobby.connectionError;
       case 'notfound': return et.lobby.notFound;
       case 'full': return et.lobby.roomFull;
@@ -549,13 +554,12 @@ export default function GameBoard({
         <span className="room-players">
           {[2, 1, 3].map((seat) => {
             const connected = connectedSeats.includes(seat);
-            const filledLabel = playerNames[seat] || '✓';
+            const held = heldSeats.includes(seat);
+            const cls = connected ? 'filled' : held ? 'held' : 'ai';
+            const mark = connected ? (playerNames[seat] || '✓') : held ? '⟳' : et.lobby.empty;
             return (
-              <span
-                key={seat}
-                className={`room-seat ${connected ? 'filled' : 'ai'}`}
-              >
-                {seatLabel(seat)}: {connected ? filledLabel : et.lobby.empty}
+              <span key={seat} className={`room-seat ${cls}`}>
+                {seatLabel(seat)}: {mark}
               </span>
             );
           })}
@@ -665,6 +669,21 @@ export default function GameBoard({
                     placeholder={et.lobby.namePlaceholder}
                     onChange={(e) => setJoinName(e.target.value)}
                   />
+                  <label className="settings-join-label" htmlFor="host-code">
+                    {et.lobby.chooseCode}
+                  </label>
+                  <input
+                    id="host-code"
+                    className="settings-join-input"
+                    type="text"
+                    value={hostCode}
+                    maxLength={8}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    placeholder={et.lobby.codePlaceholder}
+                    onChange={(e) => setHostCode(normalizeCode(e.target.value))}
+                  />
+                  <p className="settings-code-hint">{et.lobby.codeHint}</p>
                   <div className="settings-join-actions">
                     <button
                       type="submit"
@@ -706,19 +725,18 @@ export default function GameBoard({
                     id="room-code"
                     className="settings-join-input"
                     type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
                     value={joinCode}
-                    maxLength={4}
+                    maxLength={8}
                     autoComplete="off"
-                    placeholder="1234"
-                    onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    autoCapitalize="characters"
+                    placeholder={et.lobby.codePlaceholder}
+                    onChange={(e) => setJoinCode(normalizeCode(e.target.value))}
                   />
                   <div className="settings-join-actions">
                     <button
                       type="submit"
                       className="settings-item primary"
-                      disabled={isConnecting || joinCode.length !== 4}
+                      disabled={isConnecting || joinCode.length < 3}
                     >
                       {et.lobby.connect}
                     </button>

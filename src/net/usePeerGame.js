@@ -20,7 +20,12 @@ import {
 } from '../game/gameState';
 import { makeAIBid, chooseAITrump, chooseAICard } from '../game/ai';
 
-const STORAGE_KEY = 'sasku-game-state';
+const STORAGE_KEY = 'sasku-game-state';      // single-player save
+const HOST_STATE_KEY = 'sasku-host-state';    // host's networked game (survives refresh)
+const SESSION_KEY = 'sasku-mp-session';       // {role, code, name} — drives auto-resume
+const CLIENT_ID_KEY = 'sasku-client-id';      // stable per-device identity
+const ROOM_CODE_KEY = 'sasku-room-code';      // last room code (remembered / prefilled)
+const HOST_SEATS_KEY = 'sasku-host-seats';    // {clientId: seat} — restores seats after host refresh
 
 // Prefix to namespace our peer ids on the public PeerJS broker
 const CODE_PREFIX = 'sasku-';
@@ -30,29 +35,62 @@ const CODE_PREFIX = 'sasku-';
 // seats 1 & 3 = opponents (join afterwards). Empty seats are AI.
 const SEAT_ORDER = [2, 1, 3];
 
-// Modes: 'single' | 'host' | 'client'. The app boots in 'single'; network play
-// is started from the in-game menu. In 'single' and 'host' modes this peer owns
-// the authoritative game state.
+// How long a seat is held for a disconnected human before an AI takes over.
+const DISCONNECT_GRACE_MS = 45000;
+
+// Modes: 'single' | 'host' | 'client'. The app boots in 'single' (or resumes a
+// saved network session). In 'single'/'host' this peer owns the game state.
+
+function safeGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function safeSet(key, value) { try { localStorage.setItem(key, value); } catch { /* ignore */ } }
+function safeRemove(key) { try { localStorage.removeItem(key); } catch { /* ignore */ } }
+
+// Codes are normalised to A–Z/0–9. A user may set their own; the default is a
+// 4-digit numeric code (so phones show the number keypad).
+export function normalizeCode(raw) {
+  return (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+}
 
 function makeRoomCode() {
-  // 4-digit numeric code so phones show the number keypad
   let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += Math.floor(Math.random() * 10);
-  }
+  for (let i = 0; i < 4; i++) code += Math.floor(Math.random() * 10);
   return code;
 }
 
-function loadSavedState() {
+function readSession() {
+  try { return JSON.parse(safeGet(SESSION_KEY) || 'null'); } catch { return null; }
+}
+
+function getClientId() {
+  let id = safeGet(CLIENT_ID_KEY);
+  if (!id) {
+    id = 'c-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+    safeSet(CLIENT_ID_KEY, id);
+  }
+  return id;
+}
+
+function loadSeatMap() {
+  try { return JSON.parse(safeGet(HOST_SEATS_KEY) || '{}'); } catch { return {}; }
+}
+function saveSeatMap(map) { safeSet(HOST_SEATS_KEY, JSON.stringify(map)); }
+function setSeatInMap(clientId, seat) { saveSeatMap({ ...loadSeatMap(), [clientId]: seat }); }
+function removeSeatFromMap(clientId) {
+  const next = { ...loadSeatMap() };
+  delete next[clientId];
+  saveSeatMap(next);
+}
+
+function loadSavedState(key) {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = safeGet(key);
     if (saved) {
-      const loadedState = JSON.parse(saved);
-      if (!loadedState.matchWins) loadedState.matchWins = [0, 0];
-      if (loadedState.pokkBonus === undefined) loadedState.pokkBonus = false;
-      if (!loadedState.hasExchangedPicture) loadedState.hasExchangedPicture = [false, false, false, false];
-      if (loadedState.pendingPictureExchange === undefined) loadedState.pendingPictureExchange = null;
-      return loadedState;
+      const s = JSON.parse(saved);
+      if (!s.matchWins) s.matchWins = [0, 0];
+      if (s.pokkBonus === undefined) s.pokkBonus = false;
+      if (!s.hasExchangedPicture) s.hasExchangedPicture = [false, false, false, false];
+      if (s.pendingPictureExchange === undefined) s.pendingPictureExchange = null;
+      return s;
     }
   } catch (error) {
     console.error('Failed to load game state:', error);
@@ -102,9 +140,6 @@ function applyAction(state, seat, action) {
       return quickRuutuBid(state, seat);
 
     case 'initiateExchange': {
-      // A player offers their single picture to their partner. Allowed at any
-      // time during bidding (not just on the player's own turn), as long as
-      // the player themself has not yet bid or passed (canExchangePicture).
       if (state.phase !== GAME_PHASES.BIDDING) return state;
       if (state.pendingPictureExchange) return state;
       if (!canExchangePicture(state, seat)) return state;
@@ -114,7 +149,6 @@ function applyAction(state, seat, action) {
     }
 
     case 'exchangeGiveBack': {
-      // The partner responds by choosing a (non-picture) card to give back.
       const pending = state.pendingPictureExchange;
       if (!pending) return state;
       if (seat !== getPartner(pending.fromPlayer)) return state;
@@ -146,66 +180,74 @@ function applyAction(state, seat, action) {
 }
 
 export function usePeerGame() {
-  // Boot straight into a single-player game (resuming any saved game). The old
-  // landing menu is gone; network play is started from the in-game menu.
-  const [mode, setMode] = useState('single');
-  const [gameState, setGameState] = useState(() => loadSavedState() || createInitialState());
+  // Boot into single-player, unless a saved network session should be resumed.
+  const [mode, setMode] = useState(() => { const s = readSession(); return s && s.role ? s.role : 'single'; });
+  const [gameState, setGameState] = useState(() => (readSession() ? null : (loadSavedState(STORAGE_KEY) || createInitialState())));
   const [mySeat, setMySeat] = useState(0);
   const [roomCode, setRoomCode] = useState(null);
-  const [connectedSeats, setConnectedSeats] = useState([]);
-  // Display name per seat (null = AI / no custom name). Joiners supply their own.
+  const [connectedSeats, setConnectedSeats] = useState([]); // seats with a live connection
+  const [heldSeats, setHeldSeats] = useState([]);           // seats held during disconnect grace
   const [playerNames, setPlayerNames] = useState([null, null, null, null]);
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState(() => (readSession() ? 'connecting' : null));
+  const [savedCode, setSavedCode] = useState(safeGet(ROOM_CODE_KEY) || '');
 
   const peerRef = useRef(null);
-  const connsRef = useRef(new Map()); // host: seat -> DataConnection
-  const hostConnRef = useRef(null); // client: connection to host
+  const seatsRef = useRef(new Map()); // host: seat -> { conn: DataConnection|null, clientId }
+  const graceRef = useRef(new Map()); // host: seat -> grace timeout id
+  const hostConnRef = useRef(null);   // client: connection to host
   const gameStateRef = useRef(null);
+  const modeRef = useRef(mode);
+  const manualLeaveRef = useRef(false);
+  const clientReconnectRef = useRef(null);
 
   const isHost = mode === 'single' || mode === 'host';
 
-  useEffect(() => {
-    gameStateRef.current = gameState;
-  }, [gameState]);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
-  // Persist single-player game to localStorage (networked games are transient)
+  const syncSeatStates = useCallback(() => {
+    const connected = [];
+    const held = [];
+    seatsRef.current.forEach((meta, seat) => {
+      if (meta.conn) connected.push(seat);
+      else held.push(seat);
+    });
+    setConnectedSeats(connected);
+    setHeldSeats(held);
+  }, []);
+
+  // Persist single-player OR host networked game so a refresh can resume it
   useEffect(() => {
-    if (mode !== 'single' || !gameState) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
-    } catch (error) {
-      console.error('Failed to save game state:', error);
-    }
+    if (!gameState) return;
+    if (mode === 'single') safeSet(STORAGE_KEY, JSON.stringify(gameState));
+    else if (mode === 'host') safeSet(HOST_STATE_KEY, JSON.stringify(gameState));
   }, [gameState, mode]);
 
-  // Host: broadcast authoritative state to all connected clients on every change
+  // Host: broadcast authoritative state to all live clients on every change
   useEffect(() => {
     if (mode !== 'host' || !gameState) return;
-    connsRef.current.forEach((conn) => {
-      if (conn.open) conn.send({ type: 'state', gameState });
+    seatsRef.current.forEach((meta) => {
+      if (meta.conn && meta.conn.open) meta.conn.send({ type: 'state', gameState });
     });
   }, [gameState, mode]);
 
   // Host: keep every client's view of the seat names in sync
   useEffect(() => {
     if (mode !== 'host') return;
-    connsRef.current.forEach((conn) => {
-      if (conn.open) conn.send({ type: 'names', names: playerNames });
+    seatsRef.current.forEach((meta) => {
+      if (meta.conn && meta.conn.open) meta.conn.send({ type: 'names', names: playerNames });
     });
   }, [playerNames, mode]);
 
-  // Host: drive AI for any seat that is not occupied by a human
+  // Host: drive AI for any seat not occupied by a human (connected or held)
   useEffect(() => {
     if (!isHost || !gameState) return;
 
-    const humanSeats = mode === 'host' ? [0, ...connectedSeats] : [0];
+    const humanSeats = mode === 'host' ? [0, ...connectedSeats, ...heldSeats] : [0];
 
-    // A picture exchange is pending: if the partner who must respond is an AI,
-    // let it pick a card to give back; otherwise wait for the human partner.
     if (gameState.pendingPictureExchange) {
       const responder = getPartner(gameState.pendingPictureExchange.fromPlayer);
       if (humanSeats.includes(responder)) return;
-
       const timer = setTimeout(() => {
         setGameState((prev) => {
           if (!prev || !prev.pendingPictureExchange) return prev;
@@ -221,7 +263,7 @@ export function usePeerGame() {
     }
 
     const cp = gameState.currentPlayer;
-    if (humanSeats.includes(cp)) return; // wait for a human action
+    if (humanSeats.includes(cp)) return; // wait for a human (possibly reconnecting)
 
     const phase = gameState.phase;
     if (phase !== GAME_PHASES.DEAL_CHOICE &&
@@ -243,7 +285,6 @@ export function usePeerGame() {
         if (humanSeats.includes(player)) return prev;
 
         if (prev.phase === GAME_PHASES.DEAL_CHOICE) {
-          // 15% Pime Ruutu, 10% Valida, 75% Tõstan
           const rand = Math.random();
           if (rand < 0.15) return chooseDealOption(prev, DEAL_OPTIONS.PIME_RUUTU);
           if (rand < 0.25) return chooseDealOption(prev, DEAL_OPTIONS.VALIDA);
@@ -257,11 +298,7 @@ export function usePeerGame() {
           return chooseCardPack(prev, player, packIndex);
         }
         if (prev.phase === GAME_PHASES.BIDDING) {
-          // A player who has passed stays out: just pass through quickly
-          if (prev.hasPassed[player]) {
-            return passBid(prev, player);
-          }
-          // Maybe initiate a picture exchange with the partner (70%)
+          if (prev.hasPassed[player]) return passBid(prev, player);
           if (canExchangePicture(prev, player) && Math.random() < 0.7) {
             const pictureCard = prev.hands[player].find(c => c.isPicture);
             if (pictureCard) {
@@ -277,7 +314,6 @@ export function usePeerGame() {
         if (prev.phase === GAME_PHASES.PLAYING) {
           const card = chooseAICard(prev, player);
           if (card) return playCard(prev, player, card);
-          // Fallback: play the first legal card if the AI returned nothing
           const fallback = prev.hands[player].find(c => canPlayCard(prev, player, c));
           return fallback ? playCard(prev, player, fallback) : prev;
         }
@@ -286,15 +322,14 @@ export function usePeerGame() {
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [gameState, isHost, mode, connectedSeats]);
+  }, [gameState, isHost, mode, connectedSeats, heldSeats]);
 
-  // Host: auto-pass for a human seat that has already passed during bidding
+  // Host: auto-pass a human seat that already passed during bidding
   useEffect(() => {
     if (!isHost || !gameState) return;
-    if (gameState.phase !== GAME_PHASES.BIDDING) return;
-    if (gameState.pendingPictureExchange) return;
+    if (gameState.phase !== GAME_PHASES.BIDDING || gameState.pendingPictureExchange) return;
 
-    const humanSeats = mode === 'host' ? [0, ...connectedSeats] : [0];
+    const humanSeats = mode === 'host' ? [0, ...connectedSeats, ...heldSeats] : [0];
     const cp = gameState.currentPlayer;
     if (!humanSeats.includes(cp) || !gameState.hasPassed[cp]) return;
 
@@ -307,16 +342,30 @@ export function usePeerGame() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [gameState, isHost, mode, connectedSeats]);
+  }, [gameState, isHost, mode, connectedSeats, heldSeats]);
+
+  const clearName = useCallback((seat) => {
+    setPlayerNames((prev) => {
+      if (!prev[seat]) return prev;
+      const next = [...prev];
+      next[seat] = null;
+      return next;
+    });
+  }, []);
+
+  const clearGraceTimers = useCallback(() => {
+    graceRef.current.forEach((t) => clearTimeout(t));
+    graceRef.current.clear();
+  }, []);
 
   const cleanupPeer = useCallback(() => {
-    connsRef.current.forEach((conn) => {
-      try { conn.close(); } catch { /* ignore */ }
+    if (clientReconnectRef.current) { clearTimeout(clientReconnectRef.current); clientReconnectRef.current = null; }
+    clearGraceTimers();
+    seatsRef.current.forEach((meta) => {
+      if (meta.conn) { try { meta.conn.close(); } catch { /* ignore */ } }
     });
-    connsRef.current.clear();
+    seatsRef.current.clear();
     if (hostConnRef.current) {
-      // Tell the host we're leaving so it can hand our seat to the AI right
-      // away, without waiting on WebRTC's (unreliable) close detection.
       try {
         if (hostConnRef.current.open) hostConnRef.current.send({ type: 'leave' });
       } catch { /* ignore */ }
@@ -327,43 +376,117 @@ export function usePeerGame() {
       try { peerRef.current.destroy(); } catch { /* ignore */ }
       peerRef.current = null;
     }
-  }, []);
+  }, [clearGraceTimers]);
 
   const dispatch = useCallback((action) => {
     if (isHost) {
-      // Host's local human always occupies seat 0
-      setGameState((prev) => applyAction(prev, 0, action));
+      setGameState((prev) => applyAction(prev, 0, action)); // host's local human = seat 0
     } else if (hostConnRef.current && hostConnRef.current.open) {
       hostConnRef.current.send({ type: 'action', action });
     }
   }, [isHost]);
 
-  const startSingle = useCallback(() => {
-    cleanupPeer();
-    setMode('single');
-    setMySeat(0);
-    setConnectedSeats([]);
-    setPlayerNames([null, null, null, null]);
-    setRoomCode(null);
-    setStatus(null);
-    setGameState(loadSavedState() || createInitialState());
-  }, [cleanupPeer]);
+  // ---- Host ----------------------------------------------------------------
 
-  const resetGame = useCallback(() => {
-    if (!isHost) return;
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-    setGameState(createInitialState());
-  }, [isHost]);
+  const assignSeat = useCallback((clientId) => {
+    for (const [seat, meta] of seatsRef.current) {
+      if (meta.clientId === clientId) return seat; // returning player keeps their seat
+    }
+    const map = loadSeatMap();
+    if (map[clientId] !== undefined && !seatsRef.current.has(map[clientId])) {
+      return map[clientId]; // reclaim a persisted seat after a host refresh
+    }
+    const used = new Set([...seatsRef.current.keys(), ...Object.values(map)]);
+    const seat = SEAT_ORDER.find((s) => !used.has(s));
+    if (seat !== undefined) setSeatInMap(clientId, seat);
+    return seat;
+  }, []);
 
-  const createGame = useCallback((name) => {
+  const freeSeat = useCallback((seat, clientId) => {
+    const t = graceRef.current.get(seat);
+    if (t) clearTimeout(t);
+    graceRef.current.delete(seat);
+    seatsRef.current.delete(seat);
+    removeSeatFromMap(clientId);
+    clearName(seat);
+    syncSeatStates();
+  }, [clearName, syncSeatStates]);
+
+  const holdSeat = useCallback((seat, clientId, conn) => {
+    const meta = seatsRef.current.get(seat);
+    if (!meta || (conn && meta.conn !== conn)) return; // superseded by a newer connection
+    seatsRef.current.set(seat, { conn: null, clientId }); // keep the name during grace
+    syncSeatStates();
+    if (graceRef.current.has(seat)) clearTimeout(graceRef.current.get(seat));
+    graceRef.current.set(seat, setTimeout(() => freeSeat(seat, clientId), DISCONNECT_GRACE_MS));
+  }, [freeSeat, syncSeatStates]);
+
+  const handleHostConnection = useCallback((conn) => {
+    conn.on('open', () => {
+      const clientId = (conn.metadata && conn.metadata.clientId) || ('anon-' + conn.peer);
+      const rawName = conn.metadata && typeof conn.metadata.name === 'string'
+        ? conn.metadata.name.trim().slice(0, 12) : '';
+      const seat = assignSeat(clientId);
+
+      if (seat === undefined) {
+        conn.send({ type: 'full' });
+        setTimeout(() => { try { conn.close(); } catch { /* ignore */ } }, 200);
+        return;
+      }
+
+      if (graceRef.current.has(seat)) { clearTimeout(graceRef.current.get(seat)); graceRef.current.delete(seat); }
+      const existing = seatsRef.current.get(seat);
+      if (existing && existing.conn && existing.conn !== conn) {
+        try { existing.conn.close(); } catch { /* ignore */ }
+      }
+
+      seatsRef.current.set(seat, { conn, clientId });
+      syncSeatStates();
+      setPlayerNames((prev) => {
+        const next = [...prev];
+        next[seat] = rawName || null;
+        return next;
+      });
+
+      conn.send({ type: 'welcome', seat });
+      conn.send({ type: 'state', gameState: gameStateRef.current });
+
+      conn.on('data', (data) => {
+        if (data && data.type === 'action') {
+          setGameState((prev) => applyAction(prev, seat, data.action));
+        } else if (data && data.type === 'leave') {
+          // Explicit leave — hand the seat to the AI immediately (no grace)
+          try { conn.close(); } catch { /* ignore */ }
+          freeSeat(seat, clientId);
+        }
+      });
+
+      // Disconnects (close/error/dropped ICE) hold the seat for a grace window so
+      // a refresh or app-switch can reclaim it before an AI takes over.
+      const onDrop = () => holdSeat(seat, clientId, conn);
+      conn.on('close', onDrop);
+      conn.on('error', onDrop);
+      conn.on('iceStateChanged', (state) => {
+        if (state === 'disconnected' || state === 'failed' || state === 'closed') onDrop();
+      });
+    });
+  }, [assignSeat, freeSeat, holdSeat, syncSeatStates]);
+
+  const createGame = useCallback((name, requestedCode, opts) => {
+    const resume = !!(opts && opts.resume);
     cleanupPeer();
+    manualLeaveRef.current = false;
     setStatus('connecting');
     setConnectedSeats([]);
+    setHeldSeats([]);
     const hostName = typeof name === 'string' ? name.trim().slice(0, 12) : '';
     setPlayerNames([hostName || null, null, null, null]);
 
-    const attempt = () => {
-      const code = makeRoomCode();
+    const normalized = normalizeCode(requestedCode);
+    const fixedCode = normalized || (resume ? normalizeCode(savedCode) : '');
+    let attempts = 0;
+
+    const attempt = (code) => {
       const peer = new Peer(CODE_PREFIX + code);
       peerRef.current = peer;
 
@@ -372,138 +495,188 @@ export function usePeerGame() {
         setMySeat(0);
         setMode('host');
         setStatus('ready');
-        // Networked games always start fresh (single-player save is left intact)
-        setGameState(createInitialState());
+        setSavedCode(code);
+        safeSet(ROOM_CODE_KEY, code);
+        safeSet(SESSION_KEY, JSON.stringify({ role: 'host', code, name: hostName }));
+
+        if (resume) {
+          setGameState(loadSavedState(HOST_STATE_KEY) || createInitialState());
+          // Give previously-seated players a grace window to reconnect
+          const map = loadSeatMap();
+          Object.entries(map).forEach(([clientId, seat]) => {
+            if (seatsRef.current.has(seat)) return;
+            seatsRef.current.set(seat, { conn: null, clientId });
+            graceRef.current.set(seat, setTimeout(() => freeSeat(seat, clientId), DISCONNECT_GRACE_MS));
+          });
+          syncSeatStates();
+        } else {
+          saveSeatMap({});
+          setGameState(createInitialState());
+        }
       });
 
       peer.on('error', (err) => {
         if (err && err.type === 'unavailable-id') {
-          // Room code collision on the broker - try another one
+          attempts += 1;
           try { peer.destroy(); } catch { /* ignore */ }
-          attempt();
+          if (fixedCode && attempts <= 5) {
+            clientReconnectRef.current = setTimeout(() => attempt(fixedCode), 1500);
+          } else {
+            attempt(makeRoomCode());
+          }
           return;
         }
         console.error('Peer error:', err);
         setStatus('error');
       });
 
-      peer.on('connection', (conn) => {
-        conn.on('open', () => {
-          const occupied = Array.from(connsRef.current.keys());
-          const seat = SEAT_ORDER.find((s) => !occupied.includes(s));
-
-          if (seat === undefined) {
-            conn.send({ type: 'full' });
-            setTimeout(() => { try { conn.close(); } catch { /* ignore */ } }, 200);
-            return;
-          }
-
-          connsRef.current.set(seat, conn);
-          setConnectedSeats(Array.from(connsRef.current.keys()));
-
-          // The joiner's chosen name travels in the connection metadata.
-          const rawName = conn.metadata && typeof conn.metadata.name === 'string'
-            ? conn.metadata.name.trim().slice(0, 12)
-            : '';
-          setPlayerNames((prev) => {
-            const next = [...prev];
-            next[seat] = rawName || null;
-            return next;
-          });
-
-          conn.send({ type: 'welcome', seat });
-          conn.send({ type: 'state', gameState: gameStateRef.current });
-
-          // Free this seat (idempotent) so the AI driver takes it over. Used by
-          // every disconnect path below — graceful leave, close, error, or a
-          // dropped ICE connection — regardless of which seat (partner or
-          // opponent) the player occupied.
-          const releaseSeat = () => {
-            if (connsRef.current.get(seat) !== conn) return;
-            try { conn.close(); } catch { /* ignore */ }
-            connsRef.current.delete(seat);
-            setConnectedSeats(Array.from(connsRef.current.keys()));
-            setPlayerNames((prev) => {
-              if (!prev[seat]) return prev;
-              const next = [...prev];
-              next[seat] = null;
-              return next;
-            });
-          };
-
-          conn.on('data', (data) => {
-            if (data && data.type === 'action') {
-              setGameState((prev) => applyAction(prev, seat, data.action));
-            } else if (data && data.type === 'leave') {
-              releaseSeat();
-            }
-          });
-
-          conn.on('close', releaseSeat);
-          conn.on('error', releaseSeat);
-          // WebRTC's 'close' is unreliable when a tab is closed abruptly; the
-          // ICE state change is the dependable signal for a vanished peer.
-          conn.on('iceStateChanged', (state) => {
-            if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-              releaseSeat();
-            }
-          });
-        });
-      });
-    };
-
-    attempt();
-  }, [cleanupPeer]);
-
-  const joinGame = useCallback((code, name) => {
-    if (!code) return;
-    cleanupPeer();
-    setStatus('connecting');
-    setPlayerNames([null, null, null, null]);
-
-    const myName = typeof name === 'string' ? name.trim().slice(0, 12) : '';
-
-    const peer = new Peer();
-    peerRef.current = peer;
-
-    peer.on('open', () => {
-      const hostId = CODE_PREFIX + code.trim().toUpperCase();
-      const conn = peer.connect(hostId, { reliable: true, metadata: { name: myName } });
-      hostConnRef.current = conn;
-
-      conn.on('open', () => setStatus('connected'));
-
-      conn.on('data', (data) => {
-        if (!data) return;
-        if (data.type === 'welcome') {
-          setMySeat(data.seat);
-          setRoomCode(code.trim().toUpperCase());
-          setMode('client');
-          setStatus('connected');
-        } else if (data.type === 'state') {
-          setGameState(data.gameState);
-        } else if (data.type === 'names') {
-          setPlayerNames(data.names);
-        } else if (data.type === 'full') {
-          setStatus('full');
+      peer.on('disconnected', () => {
+        if (!manualLeaveRef.current && peerRef.current === peer && !peer.destroyed) {
+          try { peer.reconnect(); } catch { /* ignore */ }
         }
       });
 
-      conn.on('close', () => setStatus('disconnected'));
-      conn.on('error', (err) => {
-        console.error('Connection error:', err);
-        setStatus('error');
-      });
-    });
+      peer.on('connection', handleHostConnection);
+    };
 
-    peer.on('error', (err) => {
-      console.error('Peer error:', err);
-      // peer-unavailable means the room code doesn't exist
-      setStatus(err && err.type === 'peer-unavailable' ? 'notfound' : 'error');
-    });
+    attempt(fixedCode || makeRoomCode());
+  }, [cleanupPeer, handleHostConnection, freeSeat, syncSeatStates, savedCode]);
+
+  // ---- Client --------------------------------------------------------------
+
+  const joinGame = useCallback((requestedCode, name) => {
+    const code = normalizeCode(requestedCode) || normalizeCode(savedCode);
+    if (!code) return;
+
+    cleanupPeer();
+    manualLeaveRef.current = false;
+    setPlayerNames([null, null, null, null]);
+    const myName = typeof name === 'string' ? name.trim().slice(0, 12) : '';
+    const clientId = getClientId();
+
+    const openConnection = (isRetry) => {
+      setStatus(isRetry ? 'reconnecting' : 'connecting');
+      const peer = new Peer();
+      peerRef.current = peer;
+
+      const scheduleRetry = () => {
+        if (manualLeaveRef.current) return;
+        if (clientReconnectRef.current) clearTimeout(clientReconnectRef.current);
+        setStatus('reconnecting');
+        clientReconnectRef.current = setTimeout(() => {
+          if (manualLeaveRef.current) return;
+          try { peer.destroy(); } catch { /* ignore */ }
+          openConnection(true);
+        }, 2500);
+      };
+
+      peer.on('open', () => {
+        const conn = peer.connect(CODE_PREFIX + code, { reliable: true, metadata: { name: myName, clientId } });
+        hostConnRef.current = conn;
+
+        conn.on('open', () => setStatus('connected'));
+
+        conn.on('data', (data) => {
+          if (!data) return;
+          if (data.type === 'welcome') {
+            setMySeat(data.seat);
+            setRoomCode(code);
+            setMode('client');
+            setStatus('connected');
+            setSavedCode(code);
+            safeSet(ROOM_CODE_KEY, code);
+            safeSet(SESSION_KEY, JSON.stringify({ role: 'client', code, name: myName }));
+          } else if (data.type === 'state') {
+            setGameState(data.gameState);
+          } else if (data.type === 'names') {
+            setPlayerNames(data.names);
+          } else if (data.type === 'full') {
+            setStatus('full');
+            manualLeaveRef.current = true; // don't hammer a full room
+          }
+        });
+
+        conn.on('close', scheduleRetry);
+        conn.on('error', (err) => { console.error('Connection error:', err); scheduleRetry(); });
+      });
+
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        if (err && err.type === 'peer-unavailable') {
+          setStatus(modeRef.current === 'client' ? 'reconnecting' : 'notfound');
+        }
+        scheduleRetry();
+      });
+
+      peer.on('disconnected', () => {
+        if (!manualLeaveRef.current && peerRef.current === peer && !peer.destroyed) {
+          try { peer.reconnect(); } catch { /* ignore */ }
+        }
+      });
+    };
+
+    openConnection(false);
+  }, [cleanupPeer, savedCode]);
+
+  // ---- Menu / lifecycle ----------------------------------------------------
+
+  const startSingle = useCallback(() => {
+    manualLeaveRef.current = true;
+    cleanupPeer();
+    safeRemove(SESSION_KEY);
+    safeRemove(HOST_STATE_KEY);
+    saveSeatMap({});
+    setMode('single');
+    setMySeat(0);
+    setConnectedSeats([]);
+    setHeldSeats([]);
+    setPlayerNames([null, null, null, null]);
+    setRoomCode(null);
+    setStatus(null);
+    setGameState(loadSavedState(STORAGE_KEY) || createInitialState());
   }, [cleanupPeer]);
 
-  // Clean up the peer connection when the component unmounts
+  const resetGame = useCallback(() => {
+    if (!isHost) return;
+    if (mode === 'single') safeRemove(STORAGE_KEY);
+    else safeRemove(HOST_STATE_KEY);
+    setGameState(createInitialState());
+  }, [isHost, mode]);
+
+  // Auto-resume a networked session after a refresh / app restart.
+  useEffect(() => {
+    if (peerRef.current) return;
+    const session = readSession();
+    if (!session || !session.code) return;
+    const t = setTimeout(() => {
+      if (peerRef.current) return;
+      if (session.role === 'host') createGame(session.name, session.code, { resume: true });
+      else if (session.role === 'client') joinGame(session.code, session.name);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [createGame, joinGame]);
+
+  // Returning to the tab: nudge a reconnect if the connection dropped.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || manualLeaveRef.current) return;
+      const peer = peerRef.current;
+      if (peer && peer.disconnected && !peer.destroyed) {
+        try { peer.reconnect(); } catch { /* ignore */ }
+      }
+      if (modeRef.current === 'client' &&
+          (!hostConnRef.current || !hostConnRef.current.open) &&
+          !clientReconnectRef.current) {
+        const code = normalizeCode(savedCode);
+        const session = readSession();
+        if (code) joinGame(code, session ? session.name : '');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [joinGame, savedCode]);
+
+  // Clean up on unmount
   useEffect(() => cleanupPeer, [cleanupPeer]);
 
   return {
@@ -513,8 +686,10 @@ export function usePeerGame() {
     mySeat,
     roomCode,
     connectedSeats,
+    heldSeats,
     playerNames,
     status,
+    savedCode,
     dispatch,
     startSingle,
     createGame,
