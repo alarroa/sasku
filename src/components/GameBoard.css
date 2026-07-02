@@ -1166,3 +1166,41 @@
         font-size: 15px;
     }
 }
+
+/* Reconnecting indicator + held seat */
+.room-seat.held {
+    background: rgba(210, 150, 40, 0.85);
+    color: #1a1206;
+    font-weight: 600;
+}
+
+.reconnect-pill {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(210, 150, 40, 0.92);
+    color: #1a1206;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: var(--shadow-paper);
+}
+
+.reconnect-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1a1206;
+    animation: reconnect-pulse 1s ease-in-out infinite;
+}
+
+@keyframes reconnect-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}

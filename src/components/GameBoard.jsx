@@ -25,6 +25,8 @@ export default function GameBoard({
   dispatch,
   roomCode = null,
   connectedSeats = [],
+  heldSeats = [],
+  status = null,
   onNewGame,
   onLeaveToMenu
 }) {
@@ -433,10 +435,22 @@ export default function GameBoard({
     );
   };
 
+  const seatState = (seat) => {
+    if (connectedSeats.includes(seat)) return 'filled';
+    if (heldSeats.includes(seat)) return 'held';
+    return 'ai';
+  };
+
   const renderRoomBanner = () => {
     if (!roomCode) return null;
 
     const seatLabel = (seat) => (relPos(seat) === 2 ? et.lobby.seatPartner : et.lobby.seatOpponent);
+    const seatMark = (seat) => {
+      const s = seatState(seat);
+      if (s === 'filled') return '✓';
+      if (s === 'held') return '⟳';
+      return et.lobby.empty;
+    };
 
     return (
       <div className="room-banner">
@@ -444,14 +458,21 @@ export default function GameBoard({
         <span className="room-code-value">{roomCode}</span>
         <span className="room-players">
           {[2, 1, 3].map((seat) => (
-            <span
-              key={seat}
-              className={`room-seat ${connectedSeats.includes(seat) ? 'filled' : 'ai'}`}
-            >
-              {seatLabel(seat)}: {connectedSeats.includes(seat) ? '✓' : et.lobby.empty}
+            <span key={seat} className={`room-seat ${seatState(seat)}`}>
+              {seatLabel(seat)}: {seatMark(seat)}
             </span>
           ))}
         </span>
+      </div>
+    );
+  };
+
+  const renderReconnecting = () => {
+    if (status !== 'reconnecting') return null;
+    return (
+      <div className="reconnect-pill">
+        <span className="reconnect-dot" aria-hidden="true" />
+        {et.lobby.reconnecting}
       </div>
     );
   };
@@ -523,6 +544,7 @@ export default function GameBoard({
         </div>
       </header>
       {renderRoomBanner()}
+      {renderReconnecting()}
       {renderGameEnd()}
       {renderDealChoice()}
       {renderPackChoice()}
